@@ -12,7 +12,7 @@ class Loss: #base class for all losses
 
 class MSE(Loss):#mean squared error loss
     """
-    mean[ ( Y - y_approx )² ]
+    loss = mean[ ( Y - y_approx )² ]
     """
     def __init__(self , reduction : str = 'mean') -> None  :
         super(MSE , self).__init__(reduction)
@@ -26,7 +26,7 @@ class MSE(Loss):#mean squared error loss
 
 class CrossEntropy(Loss):
     """
-    mean[ - Ylog(y_approx)  ]
+    loss = mean[ - Ylog(y_approx)  ]
     """
     def __init__(self , reduction : str = 'mean' , axis :int = -1 ) -> None  :
         super(CrossEntropy , self).__init__(reduction)
@@ -40,7 +40,7 @@ class CrossEntropy(Loss):
     
 class BinaryCrossEntropy(Loss):
     """
-    mean[ - Ylog(y_approx) + (1-Y)log(1-y_approx)  ]
+    loss = mean[ - Ylog(y_approx) + (1-Y)log(1-y_approx)  ]
     """
     def __init__(self , reduction : str = 'mean' , axis :int = -1 ) -> None  :
         super(BinaryCrossEntropy , self).__init__(reduction)
@@ -55,6 +55,7 @@ class BinaryCrossEntropy(Loss):
 
 class Huber(Loss):
      """
+     x = Y - y_approx
      loss = 0.5 * x²                  if |x| <= d
      loss = 0.5 * δ² + δ * (|x| - δ)  if |x| > d
      """
