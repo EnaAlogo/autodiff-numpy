@@ -30,7 +30,7 @@ class SGD(Optimizer) : # stochastic gradient descent
     
     def step(self) -> None :
 
-        with stop_gradient(): #i prefer stop_gradient scope more than detaching i like what i made okay
+        with stop_gradient(): 
 
             for i,x in enumerate(self.parameters):
                 assert x.grad is not None and x.data.shape == x.grad.shape
@@ -68,7 +68,7 @@ class Adam(Optimizer) :
 
     def step(self) -> None :
 
-        with stop_gradient(): #i prefer stop_gradient scope more than detaching i like what i made okay
+        with stop_gradient(): 
 
             for i,x in enumerate(self.parameters):
                 assert x.grad is not None and x.data.shape == x.grad.shape
