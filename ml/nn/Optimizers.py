@@ -82,7 +82,7 @@ class Adam(Optimizer) :
 
                 self.v[i] *= self.betas[1] # v <- b1 * v-1 + (1-b1) * ▽w²
                 self.v[i] += (G**2) * (1- self.betas[1])
-
+                #i 1indexed to avoid division by zero but is this correct?
                 m_hat = self.m[i] / ( 1 - self.betas[0] ** (i+1) )
                 v_hat = self.v[i] / ( 1 - self.betas[1] ** (i+1) )
 
