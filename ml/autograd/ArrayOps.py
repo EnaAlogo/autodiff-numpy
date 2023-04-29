@@ -177,7 +177,6 @@ class Stack(Function):
     
     def __call__(self , *tensors : tuple[np.ndarray] , axis: int = 0 ) -> np.ndarray : 
         self.axis = axis
-        print(tensors) 
         return np.stack(tensors , axis= axis)
     
     def backward(self , g :  np.ndarray ) -> tuple[ Optional[np.ndarray] ]:
