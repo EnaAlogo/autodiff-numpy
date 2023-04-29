@@ -92,9 +92,11 @@ class Adam(Optimizer) :
                     self.v_max[i] = self.v_max[i].maximum(v_hat)
                     _v_max = self.v_max[i].sqrt()
                     _v_max += self.ε
-                    x -=  ( m_hat / _v_max )
+m_hat /= _v_max
+                    x -=  m_hat
                 else:
                     v_hat = v_hat.sqrt_()#v_hat is a temporary inplace is prefered
                     v_hat += self.ε 
-                    x -=  (m_hat /  v_hat)
+m_hat /= _v_max
+                    x -=  m_hat
           
