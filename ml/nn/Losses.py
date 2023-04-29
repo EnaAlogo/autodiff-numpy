@@ -74,7 +74,7 @@ class Huber(Loss):
 
 class CosineSimilarity(Loss):
      """
-     loss = -sum[ l2_norm(y_true) * l2_norm(y_pred) ]
+     loss = -sum[ l2_norm(Υ) * l2_norm(y_approx) ]
      """
      def __init__(self , reduction : str = 'mean', axis :int = -1) -> None  :
         super(CosineSimilarity , self).__init__(reduction)
