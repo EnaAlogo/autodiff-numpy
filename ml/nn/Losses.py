@@ -55,8 +55,8 @@ class BinaryCrossEntropy(Loss):
 
 class Huber(Loss):
      """
-     loss = 0.5 * x^2                  if |x| <= d
-     loss = 0.5 * d^2 + d * (|x| - d)  if |x| > d
+     loss = 0.5 * x²                  if |x| <= d
+     loss = 0.5 * δ² + δ * (|x| - δ)  if |x| > d
      """
      def __init__(self , reduction : str = 'mean', delta:float = 1.0 ) -> None  :
         super(Huber , self).__init__(reduction)
