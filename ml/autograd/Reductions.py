@@ -91,7 +91,7 @@ class Sum(Function):
 class Norm(Function):
 
     def __init__(self , x  ) ->None:
-        super(Sum ,self ).__init__(x)
+        super(Norm ,self ).__init__(x)
 
     def __call__(self ,  x : np.ndarray , axis : tuple | int = None , keepdims : bool = False) ->np.ndarray:     
         self.out : np.ndarray = np.linalg.norm(x , axis = axis , keepdims= keepdims)
