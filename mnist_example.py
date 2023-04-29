@@ -19,7 +19,7 @@ class Linear:
     @property
     def parameters(self) ->list[ml.tensor] : return [self.w , self.bias] if self.bias \
                                              is not None else [self.w]
-    
+    #gradients are automatically tracked by the '' engine ''
     def __call__(self , x: ml.tensor) ->ml.tensor:
         y : ml.tensor = x @ self.w
         return y if self.bias is None else y + self.bias
@@ -76,7 +76,7 @@ def main():
     output_shape1 = layer_1.compute_output_shape(output_shape0)
     layer_2 = Flatten()
     output_shape2 = layer_2.compute_output_shape(output_shape1)
-    #classifier has units as many as the number of classes
+
     classifier = Linear(10 , output_shape2)
 
     J :ml.losses.Loss =  ml.losses.CrossEntropy()
