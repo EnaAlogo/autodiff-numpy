@@ -10,6 +10,7 @@ class Optimizer:  #base class for all optimizers
     
     def zero_grad(self)->None: #always reset the gradients after every pass 
         for x in self.parameters:
+            #im not deleting this cuz someone somewhere may took a shallow copy of it to print it or whatever
             x.grad = None
     
 
