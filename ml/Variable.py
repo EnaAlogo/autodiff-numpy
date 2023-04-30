@@ -126,8 +126,8 @@ class Variable: #  tensor of parameters and its gradient
     
 
     def __getitem__(self , slices)-> Variable:
-        return self.__index(index = slices)
-        
+        return self.__index(index = slices if not isinstance(slices , Variable) else slices.numpy ) 
+         
             
     
     def __matmul__(self , y ) -> Variable :
