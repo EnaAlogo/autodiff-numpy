@@ -40,11 +40,9 @@ chunk = split
 unstack = Variable.unstack
 
 def concat(tensors : list[Variable] | tuple[Variable ], axis : int = 0 )->Variable:
-    print(tensors)
     return tensors[0].cat(tensors[1:] , axis = axis )
 
 def stack(tensors : list[Variable] | tuple[Variable ], axis : int = 0 )->Variable:
-    print(tensors)
     return tensors[0].stack(tensors[1:] , axis = axis )
 
 

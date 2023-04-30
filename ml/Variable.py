@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any
 import numpy as np
 import math
 from ml.AutoGradContext import Context 
@@ -20,6 +21,10 @@ class Function: # parent class for all operations trackable by autograd engine
                  if t[0] != t[1] and t[0] !=1 ]
         return post.sum( tuple(_axes(pre , post.shape)) ,keepdims=True).reshape(pre)\
                if pre != post.shape else post
+    
+    @staticmethod
+    def is_variable(x :Any): return isinstance(x , Variable)
+
 
 # decorator that takes care of constructing autograd nodes 
 def register_gradient( Op : type[Function] ) -> function : 
@@ -107,9 +112,24 @@ class Variable: #  tensor of parameters and its gradient
     def __repr__(self) -> str :
         return f'{self.data.__repr__()} ,  grad_fn = {self.grad_fn.__class__}'\
                if self.__requires_grad and self.grad_fn is not None else self.data.__repr__()
+    
+    @register_gradient(ArrayOps.Index)
+    def __index(self , *indices) ->Variable:...
 
     def __getitem__(self , slices)-> Variable:
-        return self.__slice( slices = tuple([slices],) if isinstance(slices , (slice,int))  else slices )
+
+        if isinstance(slices , (slice,int)):
+            return self.__slice(slices= (slices,))
+        
+        if isinstance(slices , (list,np.ndarray,Variable)):
+            return self.__index(Variable(slices) if not isinstance(slices,Variable) else slices)
+        
+        if isinstance(slices , tuple):
+            if all(isinstance(s , (slice , int)) for s  in slices ):
+              return self.__slice(slices = slices)
+            else:
+                return self.__index(*(Variable(s) if not isinstance(s,Variable)else s for s in slices))
+            
     
     def __matmul__(self , y ) -> Variable :
         return self.dot(y)

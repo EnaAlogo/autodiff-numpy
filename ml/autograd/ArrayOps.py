@@ -1,6 +1,6 @@
 from ml.Variable import Function
 from ml.Variable import np
-from typing import Optional
+from typing import Optional , Tuple
 
 
 class Copy(Function):
@@ -105,7 +105,7 @@ class Unsqueeze(Function):
     def __init__(self, x ) -> None:
         super(Unsqueeze , self).__init__(x)
     
-    def __call__(self , x : np.ndarray , axis : tuple | int | list ) -> np.ndarray :  
+    def __call__(self , x : np.ndarray , axis : Tuple | int | list ) -> np.ndarray :  
         return np.expand_dims(x , axis)
     
     def backward(self , g :  np.ndarray ) ->  np.ndarray :
@@ -115,9 +115,11 @@ class Slice(Function):
     def __init__(self, x ) -> None:
         super(Slice , self).__init__(x)
     
-    def __call__(self , x : np.ndarray , slices : tuple[ slice | int ]  ) -> np.ndarray :
+    def __call__(self , x : np.ndarray , slices : Tuple[ slice | int ]  ) -> np.ndarray :
         self.dims_to_expand : list[int] = []  
         self.paddings : list[int] = []
+        if any((s.step is not None for s  in slices if isinstance(s,slice))) :
+            raise ValueError('step in slices not supported for now')
         if self.requires_grad:
            _slices : list[slice | int] = [None]*x.ndim
            for  i , dim in enumerate(x.shape):
@@ -182,4 +184,23 @@ class Stack(Function):
     def backward(self , g :  np.ndarray ) -> tuple[ Optional[np.ndarray] ]:
          res =  np.split( g , len(self.parents) , axis = self.axis )
          return ( s.squeeze(self.axis) if self.needs_grad(i) else None for s,i in zip(res , range(len(self.parents))) )
+    
+
+class Index(Function):
+
+    def __init__(self , arr , *index):
+        super(Index , self).__init__(arr, *index)
+
+    def __call__(self , x :np.ndarray , *i : np.ndarray)-> np.ndarray:
+        self.index = i 
+        self.input_shape = x.shape
+        return x[i]
+    
+    def backward(self , g : np.ndarray ) -> Tuple[Optional[np.ndarray]]:
+        output = np.zeros(self.input_shape)
+        output[self.index] = g
+        return output , None
+
+    
+
     
