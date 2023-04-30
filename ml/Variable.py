@@ -126,18 +126,8 @@ class Variable: #  tensor of parameters and its gradient
     
 
     def __getitem__(self , slices)-> Variable:
-
-        if isinstance(slices , (slice,int)):
-            return self.__slice(slices= (slices,))
+        return self.__index(index = slices)
         
-        if isinstance(slices , (list,np.ndarray,Variable)):
-            return self.__index(Variable(slices , dtype = np.int64) if not isinstance(slices,Variable) else slices)
-        
-        if isinstance(slices , tuple):
-            if all(isinstance(s , (slice , int)) for s  in slices ):
-              return self.__slice(slices = slices)
-            else:
-                return self.__index(*(Variable(s) if not isinstance(s,Variable)else s for s in slices))
             
     
     def __matmul__(self , y ) -> Variable :
@@ -423,8 +413,6 @@ class Variable: #  tensor of parameters and its gradient
     def __flip(self , axis = None ):...
     @register_gradient(ArrayOps.Pad)
     def __pad(self , paddings = None ):...
-    @register_gradient(ArrayOps.Slice)
-    def __slice(self , slices = None ):...
     @register_gradient(ArrayOps.Squeeze)
     def __squeeze(self , axis = None ):...
     @register_gradient(ArrayOps.Unsqueeze)
@@ -440,7 +428,7 @@ class Variable: #  tensor of parameters and its gradient
     @staticmethod
     def __stack(*seq : tuple[Variable] , axis :int = 0 ) ->Variable : ...
     @register_gradient(ArrayOps.Index)
-    def __index(self , *indices) ->Variable:...
+    def __index(self , index = None) ->Variable:...
 
 ############# binary ops ###############################################
     @register_gradient(ArithmeticOps.Add)

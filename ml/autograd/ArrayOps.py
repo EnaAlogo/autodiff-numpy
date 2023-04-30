@@ -1,6 +1,6 @@
 from ml.Variable import Function
 from ml.Variable import np
-from typing import Optional , Tuple , List
+from typing import Optional , Tuple , List , Any
 
 
 class Copy(Function):
@@ -121,32 +121,6 @@ class Unsqueeze(Function):
     def backward(self , g :  np.ndarray ) ->  np.ndarray :
         return np.reshape(g , self.parents[0].shape)
     
-class Slice(Function):
-    def __init__(self, x ) -> None:
-        super(Slice , self).__init__(x)
-    
-    def __call__(self , x : np.ndarray , slices : Tuple[ slice | int ]  ) -> np.ndarray :
-        self.dims_to_expand : list[int] = []  
-        self.paddings : list[int] = []
-        if any((s.step is not None for s  in slices if isinstance(s,slice))) :
-            raise ValueError('step in slices not supported for now')
-        if self.requires_grad:
-           _slices : list[slice | int] = [None]*x.ndim
-           for  i , dim in enumerate(x.shape):
-               _slices[i] = slices[i] if i < len(slices) else slice(0,dim)
-           for i , (s, p) in enumerate(zip(x.shape , _slices)):
-               if isinstance(p , slice):
-                   p0 , p1 = 0 if p.start is None else p.start , s if p.stop is None else p.stop
-                   self.paddings.append( (p0 if p0 >=0 else s + p0 ,
-                                           s - p1 if p1 >=0 else  s - (p1 + s )  ) ) 
-               else:
-                    self.dims_to_expand.append(i)
-                    self.paddings.append((0,s-1))
-        return x[slices]
-    
-    def backward(self , g :  np.ndarray ) -> np.ndarray :
-        return np.pad(np.expand_dims(g , self.dims_to_expand) , self.paddings)
-    
     
 class Cast(Function):
     def __init__(self, x ) -> None:
@@ -198,18 +172,18 @@ class Stack(Function):
 
 class Index(Function):
 
-    def __init__(self , arr , *index):
-        super(Index , self).__init__(arr, *index)
+    def __init__(self , arr ):
+        super(Index , self).__init__(arr)
 
-    def __call__(self , x :np.ndarray , *i : np.ndarray)-> np.ndarray:
-        self.index = i 
+    def __call__(self , x :np.ndarray , index :Any )-> np.ndarray:
+        self.index = index
         self.input_shape = x.shape
-        return x[i]
+        return x[index]
     
     def backward(self , g : np.ndarray ) -> Tuple[Optional[np.ndarray]]:
         output = np.zeros(self.input_shape)
         output[self.index] = g
-        return output , None
+        return output 
 
     
 
