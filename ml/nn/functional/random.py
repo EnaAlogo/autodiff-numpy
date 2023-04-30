@@ -13,3 +13,6 @@ def glorot_uniform(*shape , requires_grad :bool= None ,dtype = np.float32)-> Var
 
 def binomial(shape , n , p , requires_grad :bool= None ,dtype = np.float32):
     return Variable(np.random.binomial(n,p,np.prod(shape)).reshape(shape).astype(dtype),requires_grad= requires_grad)
+
+def randint(shape ,low , high ):
+    return Variable(np.random.randint(low,high,np.prod(shape)).reshape(shape),requires_grad= False)

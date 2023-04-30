@@ -60,16 +60,25 @@ from ml.autograd.LinalgOps import will_it_need_transpose , get_axes , get_reshap
 
 class Variable: #  tensor of parameters and its gradient
 
-    def __init__(self , buffer : np.ndarray , requires_grad : bool = None , is_leaf : bool = None) ->None:
+    def __init__(self ,
+                  buffer : np.ndarray ,
+                  requires_grad : bool = None ,
+                  is_leaf : bool = None,
+                  dtype = None) ->None:
+        dtype = dtype if dtype is not None else np.float32
         if isinstance(buffer , float) or isinstance(buffer , int):
-            buffer = np.array([buffer])
+            buffer = np.array([buffer],dtype=dtype)
         elif isinstance(buffer, list) or isinstance(buffer , tuple):
-            buffer = np.array(buffer)
+            buffer = np.array(buffer,dtype=dtype)
+        elif isinstance(buffer , np.ndarray) and buffer.dtype != dtype:
+            dtype = buffer.dtype
         
         self.data :np.ndarray = buffer
         self.grad  : np.ndarray = None
         self.grad_fn : type[Function] = None
-        self.__requires_grad :bool = requires_grad if requires_grad is not None else not Context.no_grad
+        self.__requires_grad :bool = requires_grad if requires_grad is not None else \
+                               buffer.dtype in (np.float16 , np.float32 , np.float64 , np.complex64 , np.complex128)\
+                               and not Context.no_grad
         self.__is_leaf :bool = is_leaf if is_leaf is not None else True
     
 
@@ -92,7 +101,7 @@ class Variable: #  tensor of parameters and its gradient
     @requires_grad.setter
     def requires_grad(self , val : bool) ->None:
         if not isinstance(val , bool):raise ValueError(f'value must be of type bool but got {val.__class__}')
-        if self.dtype not in (np.float32 , np.float64 , np.complex64 , np.complex128):
+        if self.dtype not in (np.float16 , np.float32 , np.float64 , np.complex64 , np.complex128):
             raise ValueError('only floating point and complex number tensors can require gradients')
         self.__requires_grad = val
 
@@ -107,14 +116,14 @@ class Variable: #  tensor of parameters and its gradient
     def item(self) :
         return self.data.item()
 
+    def __len__(self) ->int : return self.size
+
     def __hash__(self) ->int : return id(self)
 
     def __repr__(self) -> str :
         return f'{self.data.__repr__()} ,  grad_fn = {self.grad_fn.__class__}'\
                if self.__requires_grad and self.grad_fn is not None else self.data.__repr__()
     
-    @register_gradient(ArrayOps.Index)
-    def __index(self , *indices) ->Variable:...
 
     def __getitem__(self , slices)-> Variable:
 
@@ -122,7 +131,7 @@ class Variable: #  tensor of parameters and its gradient
             return self.__slice(slices= (slices,))
         
         if isinstance(slices , (list,np.ndarray,Variable)):
-            return self.__index(Variable(slices) if not isinstance(slices,Variable) else slices)
+            return self.__index(Variable(slices , dtype = np.int64) if not isinstance(slices,Variable) else slices)
         
         if isinstance(slices , tuple):
             if all(isinstance(s , (slice , int)) for s  in slices ):
@@ -185,7 +194,9 @@ class Variable: #  tensor of parameters and its gradient
         return self.__pad( paddings = pads)
     
     def squeeze(self , *axis  )-> Variable:
-        return self.__squeeze( axis = axis if axis else None)
+        if isinstance(axis , (list,tuple)) and len(axis) == 1:
+           axis  = axis[0]
+        return self.__squeeze( axis = axis )
     
     def unsqueeze(self , dims)-> Variable:
         return self.__unsqueeze( axis = dims)
@@ -403,7 +414,7 @@ class Variable: #  tensor of parameters and its gradient
     def __norm(self , axis = None, keepdims : bool = False):...
 ############# array ops ###################################
     @register_gradient(ArrayOps.Cast)
-    def __cast(self , dtype = object ):...
+    def __cast(self , dtype = np.float32 ):...
     @register_gradient(ArrayOps.Reshape)
     def __reshape(self , shape = [] ):...
     @register_gradient(ArrayOps.Transpose)
@@ -428,7 +439,9 @@ class Variable: #  tensor of parameters and its gradient
     @register_gradient(ArrayOps.Stack)
     @staticmethod
     def __stack(*seq : tuple[Variable] , axis :int = 0 ) ->Variable : ...
-    
+    @register_gradient(ArrayOps.Index)
+    def __index(self , *indices) ->Variable:...
+
 ############# binary ops ###############################################
     @register_gradient(ArithmeticOps.Add)
     def __add(self , y: Variable):...

@@ -17,7 +17,8 @@ expand_dims = Variable.unsqueeze
 
 unsqueeze = expand_dims
 
-reshape = Variable.reshape
+def reshape(x : Variable , shape : tuple):
+    return x.reshape(*shape)
 
 cast = Variable.astype
 
@@ -50,5 +51,5 @@ def where(mask: Variable , a , b) ->Variable:
     a = a if isinstance(a, Variable) else Variable(a)
     return a.where(mask , b)
 
-def to_tensor(a) ->Variable:
-    return Variable(a)
+def to_tensor(a , requires_grad = None , dtype = None ) ->Variable:
+    return Variable(a,requires_grad=requires_grad , dtype = dtype )

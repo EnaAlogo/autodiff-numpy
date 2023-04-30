@@ -1,6 +1,6 @@
 from ml.Variable import Function
 from ml.Variable import np
-from typing import Optional , Tuple
+from typing import Optional , Tuple , List
 
 
 class Copy(Function):
@@ -30,12 +30,22 @@ class Transpose(Function):
     def __init__(self, x ) -> None:
         super(Transpose , self).__init__(x)
     
-    def __call__(self , x : np.ndarray , axes : tuple |  list= None ) -> np.ndarray :  
-        self.axes = axes
+    @staticmethod
+    def __transpose(x : np.ndarray , axes : Tuple[int] | List[int]  = None) ->np.ndarray:
+        if x.ndim == 1:
+            return x
+        if axes is None:
+            return x.T
+        if len(axes) == 2 :
+            return np.swapaxes(x , axes[0] , axes[1])
         return np.transpose(x , axes)
     
+    def __call__(self , x : np.ndarray , axes : Tuple[int] | List[int]   = None ) -> np.ndarray :  
+        self.axes = axes
+        return Transpose.__transpose(x, axes)
+    
     def backward(self , g :  np.ndarray ) -> np.ndarray :
-        return np.transpose(g ,self.axes)
+        return Transpose.__transpose(g, self.axes)
     
 class Reshape(Function):
 
@@ -142,7 +152,7 @@ class Cast(Function):
     def __init__(self, x ) -> None:
         super(Cast , self).__init__(x)
     
-    def __call__(self , x : np.ndarray , dtype : np.dtype ) -> np.ndarray :  
+    def __call__(self , x : np.ndarray , dtype : np.dtype= 'float' ) -> np.ndarray :  
         return x.astype(dtype)
     
     def backward(self , g :  np.ndarray ) ->  np.ndarray :
@@ -158,8 +168,8 @@ class Where(Function):
         return np.where(mask , x , y )
     
     def backward(self , g :  np.ndarray ) -> tuple[ Optional[np.ndarray] ]:                     #mask gradient is always None
-         return  np.where(self.mask , g ,0 ) if self.needs_grad(0) else None, None ,\
-                 np.where(self.mask , 0  , g) if self.needs_grad(2) else None 
+         return  Function.reverse_broadcast(self.parents[0].shape,np.where(self.mask , g ,0 )) if self.needs_grad(0) else None, None ,\
+                  Function.reverse_broadcast(self.parents[2].shape,np.where(self.mask , 0  , g)) if self.needs_grad(2) else None 
     
 class Concatenate(Function):
     def __init__(self, *tensors : tuple ) -> None:
