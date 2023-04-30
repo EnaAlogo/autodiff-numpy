@@ -62,7 +62,7 @@ class Mean(Function):
         axes = (axis,) if isinstance(axis , int) else\
         tuple( ax if ax >= 0 else ax + x.ndim for ax in axis)\
                     if axis is not None else tuple(range(x.ndim))
-        self.scale = np.prod([x.shape[a] for a in axes]) # mean is sum / the product of the dimensions that are being reduced 
+        self.scale = 1.0/ np.prod([x.shape[a] for a in axes]) # mean is sum / the product of the dimensions that are being reduced 
         out : np.ndarray = x.mean(axes , keepdims= True)
         self.inputshape = x.shape
         self.outputshape = out.shape
