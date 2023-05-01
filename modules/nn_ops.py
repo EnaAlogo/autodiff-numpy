@@ -4,7 +4,7 @@ from ml.ml import tensor as Variable
 
 
 def moments(x : Variable , axis : list | tuple = -1 , 
-            keepdims = False , corretion : int = 1 ):
+            keepdims = False , correction : int = 1 ):
     if isinstance(axis , int):
         axis = (axis,)
     mean : Variable = x.mean(axis , keepdims = True)
