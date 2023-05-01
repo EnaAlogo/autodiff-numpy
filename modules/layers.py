@@ -72,7 +72,7 @@ class LayerNorm(Layer):
         self.built = False
 
     def call(self , y:ml.tensor)->ml.tensor:
-        mean , variance = moments(y, self.axis , keepdims = True , corretion= 0 )
+        mean , variance = moments(y, self.axis , keepdims = True  )
         return batch_norm(y , mean , variance ,self.γ , self.β , self.ε )
     
     @property
