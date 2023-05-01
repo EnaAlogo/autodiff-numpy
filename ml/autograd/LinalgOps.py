@@ -1,6 +1,6 @@
 from ml.Variable import Function
 from ml.Variable import np
-
+from typing import Tuple,Optional
 
 class VectorDotProduct(Function):
      def __init__(self, x ,y ) -> None:
@@ -110,8 +110,39 @@ class PseudoInverse(Function):
          #is this even correct xd?
          return (1 - (self.inv @ self.x)) @ g.T @ (self.inv.T @ self.inv)
      
-   
+class BatchedMatrixMultiplication(Function):
+   def __init__(self , x, y)->None:
+      super(BatchedMatrixMultiplication,self).__init__(x,y)
 
+   def __call__(self,x:np.ndarray,y:np.ndarray)->np.ndarray:
+      self.x , self.y = x,y
+      return np.einsum('...hc,...cw->...hw',x,y)
+   def backward(self, g:np.ndarray)->Tuple[Optional[np.ndarray]]:
+      return np.einsum('...cw,...hw->...hc',self.y,g) if self.needs_grad(0) else None,\
+             np.einsum('...hw,...hc->...cw',g,self.x) if self.needs_grad(1) else None
+
+class MatrixVectorProduct(Function):
+   def __init__(self,x,y)->None:
+      super(MatrixVectorProduct,self).__init__(x,y)
+
+   def __call__(self,x:np.ndarray,y:np.ndarray)->np.ndarray:
+      self.x , self.y = x,y
+      return np.einsum('...ij,j->...i',x,y)
+
+   def backward(self, g:np.ndarray)->Tuple[Optional[np.ndarray]]:
+      return np.einsum('j,...i->...ij',self.y,g) if self.needs_grad(0) else None,\
+             np.einsum('...i,...ij->j',g,self.x) if self.needs_grad(1) else None
+
+  
+class Conjugate(Function):
+    def __init__(self,x)->None:
+        super(Conjugate,self).__init__(x)
+
+    def __call__(self,x:np.ndarray)->np.ndarray:
+      return np.conjugate(x)
+
+    def backward(self, g:np.ndarray)->Optional[np.ndarray]:
+      return np.conjugate(g)
     
 ########## util funcs for setting up multi dimensional dot product ###############################################
 
