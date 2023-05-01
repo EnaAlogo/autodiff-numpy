@@ -117,8 +117,9 @@ class Transformer(Layer):
 
         return self.lm_head(x)
     
+<<<<<<< HEAD
 
- ####################################################################################################################   
+ ####################### im still playing with these not sure if they work #############################################################################################   
 
 def rotate_half(x : Variable ) ->Variable :
     x  = x.reshape(*x.shape[:-1],x.shape[-1]//2 , 2 )
@@ -328,3 +329,5 @@ class CrossAttention(Layer):
             out = out + self.ff(x)
 
         return out
+=======
+>>>>>>> 13b35a9e787b32cfed7ebe45b0c6cab185d5c53c
