@@ -8,12 +8,12 @@ def zeros(shape , requires_grad :bool= None , dtype = np.float32 )-> Variable:
 def ones(shape , requires_grad:bool = None , dtype = np.float32)-> Variable:
     return Variable(np.ones(shape).astype(dtype), requires_grad= requires_grad)
 
-def arange( x , y = None  , requires_grad:bool = None , dtype = np.float32)-> Variable:
+def arange( x , y = None , step =1  , requires_grad:bool = None , dtype = np.float32)-> Variable:
     if y is None:
         start , stop = 0 , x
     else:
         start , stop = x,y
-    return Variable(np.arange(start , stop).astype(dtype), requires_grad= requires_grad)
+    return Variable(np.arange(start , stop , step ).astype(dtype), requires_grad= requires_grad)
 
 
 def eye(N : int , M: int , k: int = 0 , requires_grad :bool = None ,dtype = np.float32):

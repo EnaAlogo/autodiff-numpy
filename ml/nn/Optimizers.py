@@ -72,7 +72,7 @@ class Adam(Optimizer) :
         with stop_gradient(): 
 
             for i,x in enumerate(self.parameters):
-                assert x.grad is not None and x.data.shape == x.grad.shape
+                assert x.grad is not None and x.data.shape == x.grad.shape ,f'at {i} {x} '
                 G = x.gradient
                 if self.λ :
                     G += self.λ * x
@@ -97,6 +97,6 @@ class Adam(Optimizer) :
                 else:
                     v_hat = v_hat.sqrt_()#v_hat is a temporary inplace is prefered
                     v_hat += self.ε 
-                    m_hat /= _v_max
+                    m_hat /= v_hat
                     x -=  m_hat
           

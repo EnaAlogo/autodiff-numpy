@@ -1,6 +1,6 @@
 import numpy as np
-from ml import ml
-from ml.ml import tensor as Variable
+import ml 
+from ml import tensor as Variable
 
 
 def moments(x : Variable , axis : list | tuple = -1 , 
