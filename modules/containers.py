@@ -1,4 +1,4 @@
-from ml import ml
+import ml 
 from modules.layers import Layer , Module
 
 
@@ -11,19 +11,9 @@ class Sequential(Module):
         self.modules.append(module)
 
     def __call__(self, x) :
-        return self.__fit(x) if self.training else self.__eval(x)
-    
-    def __fit(self , x ):
-         for module in self.modules:
-            x = module(x)
-         return x
-    
-    @ml.stop_gradient
-    def __eval(self , x):
         for module in self.modules:
             x = module(x)
         return x
-
     
     def parameters(self):
         return [p for module in self.modules for p in module.parameters()]
