@@ -153,7 +153,7 @@ class BatchNorm(Layer):
         self.running_var:Variable = self.running_var_initializer(w_shape)
         self.built = True
 
-
+### TODO this ###############
 class GroupNorm(Layer):
     def __init__ (self,
                   groups=32,
