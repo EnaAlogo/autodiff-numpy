@@ -9,7 +9,7 @@ def moments(x : Variable , axis : list | tuple = -1 ,
         axis = (axis,)
     mean : Variable = x.mean(axis , keepdims = True)
     shift = x - mean
-    scale =  1.0 / np.prod( [ x.shape[ax] for ax in axis ] )
+    scale =  1.0 / (np.prod( [ x.shape[ax] for ax in axis ] )-correction)
              
     variance = (shift**2).sum(axis , keepdims) * scale
 
