@@ -118,8 +118,10 @@ class BatchedMatrixMultiplication(Function):
       self.x , self.y = x,y
       return np.einsum('...hc,...cw->...hw',x,y)
    def backward(self, g:np.ndarray)->Tuple[Optional[np.ndarray]]:
-      return np.einsum('...cw,...hw->...hc',self.y,g) if self.needs_grad(0) else None,\
-             np.einsum('...hw,...hc->...cw',g,self.x) if self.needs_grad(1) else None
+      return Function.reverse_broadcast(self.x.shape,\
+                                        np.einsum('...cw,...hw->...hc',self.y,g)) if self.needs_grad(0) else None,\
+             Function.reverse_broadcast(self.y.shape,\
+                                        np.einsum('...hw,...hc->...cw',g,self.x)) if self.needs_grad(1) else None
 
 class MatrixVectorProduct(Function):
    def __init__(self,x,y)->None:
@@ -130,7 +132,8 @@ class MatrixVectorProduct(Function):
       return np.einsum('...ij,...j->...i',x,y)
 
    def backward(self, g:np.ndarray)->Tuple[Optional[np.ndarray]]:
-      return np.einsum('...j,...i->...ij',self.y,g) if self.needs_grad(0) else None,\
+      return Function.reverse_broadcast(self.x.shape,\
+                                       np.einsum('...j,...i->...ij',self.y,g)) if self.needs_grad(0) else None,\
              Function.reverse_broadcast(self.y.shape,
              np.einsum('...i,...ij->...j',g,self.x)) if self.needs_grad(1) else None
 
