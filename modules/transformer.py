@@ -117,7 +117,6 @@ class Transformer(Layer):
 
         return self.lm_head(x)
     
-<<<<<<< HEAD
 
  ####################### im still playing with these not sure if they work #############################################################################################   
 
@@ -163,7 +162,7 @@ class ParallelTransformerBlock(Layer):
             Linear( dim, use_bias=False)
             ])
 
-        # for caching causal mask and rotary embeddings
+
         self.mask = None
         self.pos_emb = None
 
@@ -180,66 +179,36 @@ class ParallelTransformerBlock(Layer):
         return pos_emb
     
     def call(self, x, attn_mask=None):
-        """
-        einstein notation
-        b - batch
-        h - heads
-        n, i, j - sequence length (base sequence length, source, target)
-        d - feature dimension
-        """
-
         n,  h = x.shape[1],  self.heads
 
-        # pre layernorm
-
         x = self.norm(x)
-
-        # attention queries, keys, values, and feedforward inner
-
         q, k, v, ff = self.fused_attn_ff_proj(x).split(self.fused_dims, dim=-1)
 
-        # split heads
-        # they use multi-query single-key-value attention, yet another Noam Shazeer paper
-        # they found no performance loss past a certain scale, and more efficient decoding obviously
-        # https://arxiv.org/abs/1911.02150
 
         q :Variable = q.reshape(q.shape[0] , q.shape[1] // h  , n , -1 )
-        #rearrange(q, "b n (h d) -> b h n d", h=h)
-
-        # rotary embeddings
 
         positions = self.get_rotary_embedding(n)
         q, k = map(lambda t: apply_rotary_pos_emb(positions, t), (q, k))
 
-        # scale
-
         q = q * self.scale
 
-        # similarity
         # (b h w c) X (b 1 j c) -> b h w j
         sim = ml.linalg.matmul(q, k , transpose_b= True )
-
-        # causal mask
-
+        
         causal_mask = self.get_mask(n)
         sim = ml.ops.where(causal_mask , float('-inf') , sim)
 
-        # extra attention mask - for masking out attention from text CLS token to padding
-
         if attn_mask is not None:
             attn_mask = attn_mask.unsqueeze(1)
-            #rearrange(attn_mask, 'b i j -> b 1 i j')
             sim = ml.ops.where(~attn_mask , float('-inf') , sim )
-           # sim = sim.masked_fill(~attn_mask, -torch.finfo(sim.dtype).max)
 
-        # attention
+
         sim = sim - sim.max(axis = -1 , keepdims= True).detach()
         attn = ml.activations.softmax(sim , -1)
         
         # (b h w c) X (b 1 c d) -> b h w d
         out = ml.linalg.matmul( attn  , v )
 
-        # merge heads
         out = out.reshape( *out.shape[:-2] , -1 )
 
         return self.attn_out(out) + self.ff_out(ff)
@@ -280,15 +249,6 @@ class CrossAttention(Layer):
             ]) if parallel_ff else None
         
     def call(self, x, context):
-        """
-        einstein notation
-        b - batch
-        h - heads
-        n, i, j - sequence length (base sequence length, source, target)
-        d - feature dimension
-        """
-
-        # pre-layernorm, for queries and context
 
         x = self.norm(x)
         context = self.context_norm(context)
@@ -301,33 +261,22 @@ class CrossAttention(Layer):
 
         q = q * self.scale
 
-        # get key / values
-
         k, v = self.to_kv(context).split(2, dim=-1)
 
-        # query / key similarity
          # (b h w c) X (b 1 j c) -> b h w j
         sim = ml.linalg.matmul(q,k,transpose_b = True)
 
-        # attention
-
         attn = ml.activations.softmax(sim , -1 )
 
-        # aggregate
         # (b h w c) X (b 1 c j) -> b h w j
         out = ml.linalg.matmul(attn , v )
  
-        # merge and combine heads
-        
+
         out = out.reshape(*out.shape[:2] , -1)
      
         out = self.to_out(out)
-
-        # add parallel feedforward (for multimodal layers)
 
         if self.ff is not None:
             out = out + self.ff(x)
 
         return out
-=======
->>>>>>> 13b35a9e787b32cfed7ebe45b0c6cab185d5c53c
