@@ -118,6 +118,7 @@ class BatchedMatrixMultiplication(Function):
       self.x , self.y = x,y
       return np.einsum('...hc,...cw->...hw',x,y)
    def backward(self, g:np.ndarray)->Tuple[Optional[np.ndarray]]:
+   # TODO this still needs fixing equation is wrong or smth
       return Function.reverse_broadcast(self.x.shape,\
                                         np.einsum('...cw,...hw->...hc',self.y,g)) if self.needs_grad(0) else None,\
              Function.reverse_broadcast(self.y.shape,\
