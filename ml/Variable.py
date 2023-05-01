@@ -334,9 +334,9 @@ class Variable: #  tensor of parameters and its gradient
         elif self.ndim == 2 and y.ndim ==2 :
             return self.matmul(y)
         elif y.ndim == 1:
-            return self.tensordot(y,[-1,0])
+            return self.__mv(y)
         else:
-            return self.tensordot(y,[-1,y.ndim - 2])
+            return self.__bm(y)
         
     def l2_normalize(self, axis= None , eps = 1e-12) ->Variable:
         return self / (self*self).sum(axis , True)\
@@ -358,6 +358,8 @@ class Variable: #  tensor of parameters and its gradient
         ab_matmul = reshape_a.matmul(reshape_b)
         return ab_matmul.reshape(*ction) if ction != ab_matmul.shape else ab_matmul
        
+    def adjoint(self)->Variable:
+        return self.transpose(-2,-1).conj()
     
 ##################### linalg ########################################
     @register_gradient(LinalgOps.PseudoInverse)
@@ -372,6 +374,12 @@ class Variable: #  tensor of parameters and its gradient
     def __triu(self , k = 0 ):...
     @register_gradient(LinalgOps.Tril)
     def __tril(self , k = 0 ):...
+    @register_gradient(LinalgOps.BatchedMatrixMultiplication)
+    def __bm(x:Variable,y:Variable)->Variable:...
+    @register_gradient(LinalgOps.MatrixVectorProduct)
+    def __mv(x:Variable,y:Variable)->Variable:...
+    @register_gradient(LinalgOps.Conjugate)
+    def conj(self)->Variable:...
 ################### unary ops ####################################
     @register_gradient(ArithmeticOps.Logarithm)
     def log(self) -> Variable :...
