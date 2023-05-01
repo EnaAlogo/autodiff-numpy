@@ -127,11 +127,12 @@ class MatrixVectorProduct(Function):
 
    def __call__(self,x:np.ndarray,y:np.ndarray)->np.ndarray:
       self.x , self.y = x,y
-      return np.einsum('...ij,j->...i',x,y)
+      return np.einsum('...ij,...j->...i',x,y)
 
    def backward(self, g:np.ndarray)->Tuple[Optional[np.ndarray]]:
-      return np.einsum('j,...i->...ij',self.y,g) if self.needs_grad(0) else None,\
-             np.einsum('...i,...ij->j',g,self.x) if self.needs_grad(1) else None
+      return np.einsum('...j,...i->...ij',self.y,g) if self.needs_grad(0) else None,\
+             Function.reverse_broadcast(self.y.shape,
+             np.einsum('...i,...ij->...j',g,self.x)) if self.needs_grad(1) else None
 
   
 class Conjugate(Function):
