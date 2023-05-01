@@ -77,7 +77,9 @@ class Power (Function):
     
     def backward(self , g :  np.ndarray ) ->  np.ndarray:
         if self.needs_grad(0):
-            dx = self.z /self.x
+            #dx = self.z /self.x
+            #dx *= self.y
+            dx = self.x ** (self.y-1)
             dx *= self.y
             dx *= g
             dx = Function.reverse_broadcast(self.x.shape , dx)
