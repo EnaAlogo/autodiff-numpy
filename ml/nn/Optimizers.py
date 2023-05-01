@@ -97,6 +97,6 @@ class Adam(Optimizer) :
                 else:
                     v_hat = v_hat.sqrt_()#v_hat is a temporary inplace is prefered
                     v_hat += self.ε 
-                    m_hat /= _v_max
+                    m_hat /= v_hat
                     x -=  m_hat
           
