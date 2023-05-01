@@ -23,7 +23,7 @@ class CausalSelfAttention(Layer):
         self.n_embd = n_embed
 
     @property
-    def paramters_(self): return self.c_attn.parameters_ + self.c_proj.parameters_
+    def parameters_(self): return self.c_attn.parameters_ + self.c_proj.parameters_
 
     def call(self , x):
         B , T , C = x.shape
