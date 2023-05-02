@@ -1,6 +1,6 @@
 import ml 
 from ml.Variable import Variable
-from modules.nn_ops import moments, batch_norm
+from ml.nn.nn_ops import moments, batch_norm
 
 class Module():
     training:bool = True
@@ -13,6 +13,7 @@ class Layer(Module):
     def __call__(self, x : Variable ) -> Variable :
         if hasattr(self,'build') and not self.built:
                 self.build(x)
+        self.__call__ = self.call 
         return self.call(x)
     
     def parameters(self) ->list[Variable]:

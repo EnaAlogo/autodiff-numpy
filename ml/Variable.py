@@ -482,7 +482,7 @@ class Variable: #  tensor of parameters and its gradient
             grads = [grads] if len(node.grad_fn.parents) == 1 else grads
             for parent , grad in zip(node.grad_fn.parents, grads):
                 if grad is not None and parent.__requires_grad:
-                    assert grad.shape == parent.shape , f'{grad.shape} != {parent.shape}'
+                    assert grad.shape == parent.shape , f'{grad.shape} != {parent.shape} at {node.grad_fn}'
                     """
                     if the node is a leaf node which means it will retain gradient
                     we make sure the gradient is contiguous otherwise we dont rly care

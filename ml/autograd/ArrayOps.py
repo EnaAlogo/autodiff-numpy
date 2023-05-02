@@ -33,19 +33,22 @@ class Transpose(Function):
     @staticmethod
     def __transpose(x : np.ndarray , axes : Tuple[int] | List[int]  = None) ->np.ndarray:
         if x.ndim == 1:
-            return x
+            return x , None
         if axes is None:
-            return x.T
+            return x.T , None
         if len(axes) == 2 :
-            return np.swapaxes(x , axes[0] , axes[1])
-        return np.transpose(x , axes)
+            return np.swapaxes(x , axes[0] , axes[1]) , axes
+        axes_ = [None]* len(axes)
+        for i , dim in enumerate(axes):
+            axes_[dim] = i
+        return np.transpose(x , axes) , axes_
     
     def __call__(self , x : np.ndarray , axes : Tuple[int] | List[int]   = None ) -> np.ndarray :  
-        self.axes = axes
-        return Transpose.__transpose(x, axes)
+        ret , self.axes = Transpose.__transpose(x, axes)
+        return ret
     
     def backward(self , g :  np.ndarray ) -> np.ndarray :
-        return Transpose.__transpose(g, self.axes)
+        return Transpose.__transpose(g, self.axes)[0]
     
 class Reshape(Function):
 
