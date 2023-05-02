@@ -49,7 +49,16 @@ def pool2d( X : Variable , pad , size , stride , mode = Variable.max , NHWC : bo
         assert mode in (Variable.max , Variable.mean)
         # b h w c -> b c h w
         X = X.transpose(0,-1,1,2) if NHWC else X
-        pad = __get_padding(X.shape[2],X.shape[3], size[0] , size[1] , stride)
+        if isinstance(pad , int):
+            pad = (pad,pad,pad,pad)
+        elif isinstance(pad , str):
+             pad = pad.lower()
+             if pad == 'valid':
+                  pad = (0,0,0,0)
+             elif pad == 'same':
+                  pad = __get_padding(X.shape[2] , X.shape[3], size[0] , size[1] , stride)
+             else: raise ValueError('only VALID , SAME or explicit pad values supported')
+             
         N, C, H_prev, W_prev = X.shape
         if sum(pad) == 0:
            """ 
@@ -108,7 +117,6 @@ def __validate_conv_args(data_format : str , image_shape , kernel_shape , stride
           if pad == 'valid':
                pad = (0,0,0,0)
           elif pad == 'same':
-               nh , nw = math.ceil( h/strides[0]) , math.ceil(w/strides[1])
                pad = __get_padding(h , w, k1 , k2 , strides)
           else: raise ValueError('only VALID , SAME or explicit pad values supported')
      elif isinstance(pad , int):
