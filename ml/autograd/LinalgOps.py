@@ -119,7 +119,7 @@ class BatchedMatrixMultiplication(Function):
       return np.matmul(x,y)
    
    def backward(self, g:np.ndarray)->Tuple[Optional[np.ndarray]]:
-      return  np.einsum('...cw,...hw->...hc',self.y,g) if self.needs_grad(0) else None,\
+      return  np.einsum('...cw,...hw->...hc',self.y,g)) if self.needs_grad(0) else None,\
                                         np.einsum('...hw,...hc->...cw',g,self.x) if self.needs_grad(1) else None
 
 class MatrixVectorProduct(Function):
