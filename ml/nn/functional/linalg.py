@@ -8,6 +8,10 @@ tril = Variable.tril
 
 diag = Variable.diag
 
+adjoint = Variable.adjoint
+
+conjugate = Variable.conjugate
+
 diagonal = Variable.diagonal
 
 inverse = Variable.inverse

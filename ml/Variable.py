@@ -359,7 +359,7 @@ class Variable: #  tensor of parameters and its gradient
         return ab_matmul.reshape(*ction) if ction != ab_matmul.shape else ab_matmul
        
     def adjoint(self)->Variable:
-        return self.transpose(-2,-1).conj()
+        return self.transpose(-2,-1).conjugate()
     
 ##################### linalg ########################################
     @register_gradient(LinalgOps.PseudoInverse)
