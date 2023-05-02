@@ -7,6 +7,10 @@ from ml.nn.functional.ops import concat
 
 ############ helpers ############################################################
 def _im2col_indices(X_shape, fhei , fwi , stride , oh , ow):
+    """
+    indices are int tensors and never require gradient so we are free to use raw numpy here, 
+    i basically just want the indices theres no actual operation 
+    """
     _, C, H, W = X_shape
     i0 = np.repeat(np.arange(fhei), fwi)
     i0 = np.tile(i0, C)
@@ -20,6 +24,10 @@ def _im2col_indices(X_shape, fhei , fwi , stride , oh , ow):
     return i, j, d
 
 def _im2col(X, fhei, fwi, stride, pad , oh , ow):
+    """
+    padding , advanced indexing and concatenating are already implemented and will
+    be tracked by autograd engine
+    """
     x_pad = X.pad(((0,0), (0,0), (pad[0], pad[1]), (pad[2], pad[3])))
     i, j, d = _im2col_indices(X.shape, fhei, fwi, stride, oh ,ow)
     cols = x_pad[:, d, i, j]
@@ -46,6 +54,11 @@ def __get_padding(in_height , in_width, filter_height ,filter_width, strides):
     return pad_top , pad_bottom, pad_left, pad_right  
 
 def pool2d( X : Variable , pad , size , stride , mode = Variable.max , NHWC : bool = True):
+        """
+        these ugly tranposes make me wanna implement my own einops , one day i may,
+        basically we make sure the data are arranged in the correct order for the computation
+        and then returning the correct format 
+        """
         assert mode in (Variable.max , Variable.mean)
         # b h w c -> b c h w
         X = X.transpose(0,-1,1,2) if NHWC else X
@@ -79,6 +92,12 @@ def pool2d( X : Variable , pad , size , stride , mode = Variable.max , NHWC : bo
         return y.transpose(0 , 2, -1 , 1) if NHWC else y
 
 def convolve2d(X :Variable , W :Variable ,  pad  , stride , NHWC : bool = True):
+        """
+        torch mainly uses NCHW and tensorflow NHWC i personally prefer the later ,
+        when features are the second axis the kernel is ( filters , features , size0 , size1 ),
+        and when the features are last the kernel is ( size0 , size1 , features , filters ),
+        making sure the data are arranged properly is what these ugly tranposes are doing
+        """
         X = X.transpose(0 , -1 , 1, 2) if NHWC else X
         w = W.transpose(-1 , 2 , 0 , 1)  if NHWC else W
         N, _, H, Wd = X.shape
