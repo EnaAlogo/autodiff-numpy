@@ -93,7 +93,7 @@ def pool2d( X : Variable , pad , size , stride , mode = Variable.max , NHWC : bo
 
 def convolve2d(X :Variable , W :Variable ,  pad  , stride , NHWC : bool = True):
         """
-        torch mainly uses NCHW and tensorflow NHWC i personally prefer the later ,
+        torch mainly uses NCHW and tensorflow NHWC i personally prefer the latter ,
         when features are the second axis the kernel is ( filters , features , size0 , size1 ),
         and when the features are last the kernel is ( size0 , size1 , features , filters ),
         making sure the data are arranged properly is what these ugly tranposes are doing
