@@ -6,14 +6,13 @@ from ml.nn.functional.ops import concat
 
 
 ############ helpers ############################################################
-def _im2col_indices(X_shape, fhei , fwi , stride , oh , ow,
+def _im2col_indices( C ,  fhei , fwi , stride , oh , ow,
                     dilations ):
     """
     indices are int tensors and never require gradient so we are free to use raw numpy here, 
     i basically just want the indices theres no actual operation 
     """
     d1 , d2 = dilations
-    _, C, H, W = X_shape
     i0 = np.repeat(np.arange(fhei), fwi)
     i0 = np.tile(i0, C) * d1
     i1 = stride[0] * np.repeat(np.arange(oh), ow)
@@ -25,13 +24,13 @@ def _im2col_indices(X_shape, fhei , fwi , stride , oh , ow,
     d = np.repeat(np.arange(C), fhei * fwi).reshape(-1, 1)
     return i, j, d
 
-def _im2col(X, fhei, fwi, stride, pad , oh , ow ,dilation = (1,1)):
+def _im2col(X, C, fhei, fwi, stride, pad , oh , ow ,dilation = (1,1)):
     """
     padding , advanced indexing and concatenating are already implemented and will
     be tracked by autograd engine
     """
     x_pad = X.pad(((0,0), (0,0), (pad[0], pad[1]), (pad[2], pad[3]))) if sum(pad) != 0  else X
-    i, j, d = _im2col_indices(X.shape, fhei, fwi, stride, oh ,ow , dilation)
+    i, j, d = _im2col_indices(C, fhei, fwi, stride, oh ,ow , dilation)
     cols = x_pad[:, d, i, j]
     cols = concat(cols, axis=-1)
     return cols
@@ -103,7 +102,7 @@ def pool2d( X : Variable ,
         # b h w c -> b c h w
         X = X.transpose(0,-1,1,2) if NHWC else X             
         N, C, _, _ = X.shape
-        image_2col = _im2col(X, size[0], size[1], stride,pad,  outH , outW)
+        image_2col = _im2col(X , X.shape[1], size[0], size[1], stride,pad,  outH , outW)
         image_2col = image_2col.reshape(C, image_2col.shape[0]//C, -1)
         y = mode(image_2col, axis=1)
         y = tuple(y.split(N,axis=1))
@@ -129,8 +128,9 @@ def convolve2d(X :Variable ,
         X = X.transpose(0 , -1 , 1, 2) if NHWC else X
         w = W.transpose(-1 , 2 , 0 , 1)  if NHWC else W
         N = X.shape[0]
+        in_feats = w.shape[1]
         C = w.shape[0]
-        image_2col = _im2col(X, w.shape[-2], w.shape[-1], stride, pad , outH ,outW , dilations)
+        image_2col = _im2col(X, in_feats , w.shape[-2], w.shape[-1], stride, pad , outH ,outW , dilations)
         kernel_2col = w.reshape(w.shape[0], -1)
         y = kernel_2col.dot(image_2col) 
         y = tuple(y.split(N , axis=1))

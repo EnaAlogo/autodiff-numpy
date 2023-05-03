@@ -121,8 +121,8 @@ class Variable: #  tensor of parameters and its gradient
     def __hash__(self) ->int : return id(self)
 
     def __repr__(self) -> str :
-        return f'{self.data.__repr__()} ,  grad_fn = {self.grad_fn.__class__}'\
-               if self.__requires_grad and self.grad_fn is not None else self.data.__repr__()
+        return f'{self.data.__repr__()} , shape={self.shape} , grad_fn = {self.grad_fn.__class__}'\
+               if self.__requires_grad and self.grad_fn is not None else f'{self.data.__repr__()} , shape={self.shape}'
     
 
     def __getitem__(self , slices)-> Variable:

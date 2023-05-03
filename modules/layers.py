@@ -1,6 +1,7 @@
 import ml 
 from ml.Variable import Variable
 from ml.nn.functional.nn_ops import moments, batch_norm
+from typing import Tuple
 
 class Module():
     training:bool = True
@@ -223,3 +224,97 @@ class Dropout(Layer):
 
     
 
+class Conv2D(Layer):
+    def __init__(self,
+                 filters : int ,
+                 kernel_size : Tuple[int] | int,
+                 strides : Tuple[int] | int = 1,
+                 padding : str | Tuple[int] | int = 'valid',
+                 dilations : Tuple[int] | int = 1,
+                 groups : int = 1,
+                 use_bias : bool = True , 
+                 kernel_initializer = ml.initializers.GlorotUniform(),
+                 bias_initalizer = ml.initializers.Ones(),
+                 data_format = 'NHWC' ):
+        super(Conv2D,self).__init__()
+        self.filters = filters
+        self.built = False
+        self.use_bias = use_bias
+        self.kernel_initializer=kernel_initializer
+        self.bias_initalizer=bias_initalizer
+        self.kernel_size = tuple((kernel_size,kernel_size)) if isinstance(kernel_size , int) else kernel_size
+        self.strides = tuple((strides,strides)) if isinstance(strides, int) else strides
+        self.dilations = tuple((dilations,dilations)) if isinstance(dilations,int) else dilations
+        self.data_format = data_format
+        self.groups = groups
+        self.padding = padding
+
+    @property
+    def parameters_(self) ->list[Variable] : 
+        params = []
+        if self.kernel : params.append(self.w)
+        if self.bias : params.append(self.bias)
+        return params
+    
+    def call(self , x: Variable) ->Variable:
+        y : Variable = ml.nn.conv2d(x , 
+                                    self.kernel ,
+                                    self.strides , 
+                                    self.padding , 
+                                    self.dilations , 
+                                    self.data_format)
+        return y if self.bias is None else y + self.bias
+    
+    def build(self , x):
+        if self.data_format == 'NHWC':
+            if x.shape[1] % self.groups != 0 : raise ValueError('number of groups must be evenly divisible with features')
+            kernel_size = self.kernel_size + (x.shape[1] // self.groups, self.filters , ) 
+            bias_size = (self.filters ,)
+        else:  
+            if x.shape[-1] % self.groups != 0 : raise ValueError('number of groups must be evenly divisible with features')
+            kernel_size =  (self.filters , x.shape[-1] // self.groups , ) +self.kernel_size
+            bias_size = (self.filters ,1,1,1)
+
+        self.kernel :Variable = self.kernel_initializer(kernel_size)
+        self.bias :Variable = self.bias_initalizer(bias_size) if self.use_bias else None
+        self.built = True
+
+
+class MaxPool2D(Layer):
+    def __init__(self , 
+                 pool_size : Tuple[int] | int,
+                 strides : Tuple[int] | int = 1,
+                 padding : str | Tuple[int] | int = 'valid',
+                 data_format = 'NHWC') -> None:
+        super(MaxPool2D , self).__init__()
+        self.pool_size = tuple((pool_size,pool_size)) if isinstance(pool_size , int) else pool_size
+        self.strides = tuple((strides,strides)) if isinstance(strides, int) else strides
+        self.padding = padding
+        self.data_format = data_format
+    
+    def call(self,x :Variable ) ->Variable:
+        return ml.nn.max_pool2d(x , 
+                                self.pool_size ,
+                                self.strides ,
+                                self.padding ,
+                                self.data_format)
+
+
+class AvgPool2D(Layer):
+    def __init__(self , 
+                 pool_size : Tuple[int] | int,
+                 strides : Tuple[int] | int = 1,
+                 padding : str | Tuple[int] | int = 'valid',
+                 data_format = 'NHWC') -> None:
+        super(AvgPool2D , self).__init__()
+        self.pool_size = tuple((pool_size,pool_size)) if isinstance(pool_size , int) else pool_size
+        self.strides = tuple((strides,strides)) if isinstance(strides, int) else strides
+        self.padding = padding
+        self.data_format = data_format
+    
+    def call(self,x :Variable ) ->Variable:
+        return ml.nn.avg_pool2d(x , 
+                                self.pool_size ,
+                                self.strides ,
+                                self.padding ,
+                                self.data_format)
