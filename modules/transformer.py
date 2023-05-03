@@ -98,8 +98,7 @@ class Transformer(Layer):
             for _ in range(n_layers)
             ])
         self.lm_head = Linear(vocab_size , use_bias= False)
-
-    
+        
     @property
     def parameters_(self):
         return self.wte.parameters_ + self.wpe.parameters_ + self.h.parameters() + self.lm_head.parameters_

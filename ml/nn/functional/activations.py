@@ -19,8 +19,11 @@ def identity(x:__var) -> __var:...
 @__register_gradient(_A.Celu)
 def celu(x:__var) -> __var:...
 
-def silu(x:__var) ->__var:
-    return x * (1.0 / ( 1.0 + exponential(-x) ) )
+def silu(x:__var , beta : float = 1.0) ->__var:
+    u = x if beta == 1 else x * beta 
+    return x * sigmoid(u)
+
+swish = silu
 
 def leaky_relu(x : __var , α : float = 1e-2 ) ->__var:
     return x.where( x>=0 , x * α )

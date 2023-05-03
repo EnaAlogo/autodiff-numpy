@@ -12,7 +12,7 @@ class stop_gradient:
         Context.no_grad = True 
         try:
          ret = self.arg(*args,**kwds)
-         Context.no_grad = False
+         Context.no_grad = False if Context.no_grad == True else True
          return ret
         except Exception as e :
             Context.no_grad = False if Context.no_grad == True else True

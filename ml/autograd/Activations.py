@@ -20,7 +20,11 @@ class Sigmoid(Function):
         super(Sigmoid,self).__init__(x) 
 
     def __call__(self , y :np.ndarray )->np.ndarray: # σ(x) = 1 / 1 + exp(-x)
-        self.output = 1. / (1 + np.exp(-y) )
+        x = -y 
+        x = np.exp(x ,out = x)
+        x+=1
+        x = np.reciprocal(x,out= x)
+        self.output = x
         return self.output
     
     def backward(self  , g :np.ndarray )->np.ndarray:
@@ -97,3 +101,4 @@ class Gelu(Function):
        pdf +=  self.cdf
        pdf *= g
        return pdf
+

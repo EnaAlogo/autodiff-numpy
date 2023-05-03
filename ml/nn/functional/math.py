@@ -35,7 +35,7 @@ exp = Variable.exp
 
 abs = Variable.abs
 
-l2_norm = Variable.l2_normalize
+l2_normalize = Variable.l2_normalize
 
 def outer(a , b):
     a = a if isinstance(a, Variable) else Variable(a)
