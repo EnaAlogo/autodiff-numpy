@@ -273,7 +273,7 @@ class Conv2D(Layer):
         else:  
             if x.shape[-1] % self.groups != 0 : raise ValueError('number of groups must be evenly divisible with features')
             kernel_size =  (self.filters , x.shape[-1] // self.groups , ) +self.kernel_size
-            bias_size = (self.filters ,1,1,1)
+            bias_size = (1,self.filters,1,1)
 
         self.kernel :Variable = self.kernel_initializer(kernel_size)
         self.bias :Variable = self.bias_initalizer(bias_size) if self.use_bias else None
