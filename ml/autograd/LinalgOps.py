@@ -25,8 +25,8 @@ class MatMul(Function):
         return np.matmul(x,y)
     
      def backward(self , g :  np.ndarray ) ->  np.ndarray:
-         return  np.matmul(g , self.y.T)  if self.needs_grad(0) else None ,\
-                 np.matmul(self.x.T , g) if self.needs_grad(1) else None
+         return  np.matmul(g,self.y.T)  if self.needs_grad(0) else None ,\
+                 np.matmul(self.x.T, g) if self.needs_grad(1) else None
 
 class Diag(Function):
      def __init__(self, x ) -> None:
@@ -117,11 +117,17 @@ class BatchedMatrixMultiplication(Function):
    def __call__(self,x:np.ndarray,y:np.ndarray)->np.ndarray:
       self.x , self.y = x,y
       return np.matmul(x,y)
+   @staticmethod
+   def __handle_shapes(inshape , x):
+       if np.prod(inshape) > x.size:
+           return np.broadcast_to(x , inshape)
+       return Function.reverse_broadcast(inshape , x )
    
    def backward(self, g:np.ndarray)->Tuple[Optional[np.ndarray]]:
-             np.einsum('...cw,...hw->...hc',self.y,g) if self.needs_grad(0) else None,\
-             Function.reverse_broadcast(self.y.shape,\
-                                        np.einsum('...hw,...hc->...cw',g,self.x)) if self.needs_grad(1) else None
+          return BatchedMatrixMultiplication.__handle_shapes(self.x.shape,\
+                 np.einsum('...cw,...hw->...ch',g,self.y)) if self.needs_grad(0) else None,\
+                 BatchedMatrixMultiplication.__handle_shapes(self.y.shape,\
+                 np.einsum('...ch,...cw->...hw',self.x,g)) if self.needs_grad(1) else None
 
 class MatrixVectorProduct(Function):
    def __init__(self,x,y)->None:
@@ -132,10 +138,9 @@ class MatrixVectorProduct(Function):
       return np.einsum('...ij,...j->...i',x,y)
 
    def backward(self, g:np.ndarray)->Tuple[Optional[np.ndarray]]:
-      return Function.reverse_broadcast(self.x.shape,\
-                                       np.einsum('...j,...i->...ij',self.y,g)) if self.needs_grad(0) else None,\
+      return np.einsum('...i,...j->...ij',g,self.y) if self.needs_grad(0) else None,\
              Function.reverse_broadcast(self.y.shape,
-             np.einsum('...i,...ij->...j',g,self.x)) if self.needs_grad(1) else None
+             np.einsum('...ij,...i->...j',self.x,g)) if self.needs_grad(1) else None
 
   
 class Conjugate(Function):

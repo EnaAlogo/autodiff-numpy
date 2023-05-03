@@ -55,7 +55,7 @@ def inplace_operation( Op : type[function] ) ->function:
 
 
 
-from ml.autograd import ArithmeticOps , ArrayOps, LinalgOps , Reductions
+from ml.autograd import ArithmeticOps , ArrayOps, LinalgOps , Reductions , FFTs
 from ml.autograd.LinalgOps import will_it_need_transpose , get_axes , get_reshape
 
 class Variable: #  tensor of parameters and its gradient
@@ -298,7 +298,6 @@ class Variable: #  tensor of parameters and its gradient
     def clamp(self , low , high)-> Variable:
         return self.minimum( self.maximum(low) , high )
 
-
     def diag(self , k =0 )-> Variable:
         return self.__diag(k = k)
     def diagonal(self , k =0 , axis0 = 0 , axis1 = 1 ):
@@ -333,11 +332,19 @@ class Variable: #  tensor of parameters and its gradient
             return self.vdot(y)
         elif self.ndim == 2 and y.ndim ==2 :
             return self.matmul(y)
-        elif y.ndim == 1:
+        elif self.ndim == 1 and y.ndim == 2:
+            return self.unsqueeze(0).matmul(y)
+        elif self.ndim ==2 and y.ndim == 1:
             return self.__mv(y)
         else:
-            return self.__bm(y)
-        
+            if self.ndim == 1 :
+                return self.unsqueeze(0).__bm(y)
+            elif y.ndim ==1 :
+                return self.__bm(y.unsqueeze(0))
+            else :
+                return self.__bm(y)
+
+
     def l2_normalize(self, axis= None , eps = 1e-12) ->Variable:
         return self / (self*self).sum(axis , True)\
                           .maximum(eps)\
@@ -360,7 +367,9 @@ class Variable: #  tensor of parameters and its gradient
        
     def adjoint(self)->Variable:
         return self.transpose(-2,-1).conjugate()
-    
+
+################### FFTs ###########################################
+
 ##################### linalg ########################################
     @register_gradient(LinalgOps.PseudoInverse)
     def p_inverse(self)->Variable:...
@@ -478,7 +487,7 @@ class Variable: #  tensor of parameters and its gradient
         for node in reversed(graph):
             if not node.grad_fn.requires_grad: continue
             assert node.grad  is not None
-            grads = node.grad_fn.backward(node.grad  ) 
+            grads = node.grad_fn.backward(node.grad) 
             grads = [grads] if len(node.grad_fn.parents) == 1 else grads
             for parent , grad in zip(node.grad_fn.parents, grads):
                 if grad is not None and parent.__requires_grad:

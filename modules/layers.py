@@ -1,6 +1,6 @@
 import ml 
 from ml.Variable import Variable
-from ml.nn.nn_ops import moments, batch_norm
+from ml.nn.functional.nn_ops import moments, batch_norm
 
 class Module():
     training:bool = True

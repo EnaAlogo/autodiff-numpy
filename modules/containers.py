@@ -1,6 +1,6 @@
 import ml 
 from modules.layers import Layer , Module
-
+import functools
 
 class Sequential(Module):
     def __init__(self , modules : list[Layer] ) ->None:
@@ -11,6 +11,7 @@ class Sequential(Module):
         self.modules.append(module)
 
     def __call__(self, x) :
+        return functools.reduce( x , x , x )
         for module in self.modules:
             x = module(x)
         return x
