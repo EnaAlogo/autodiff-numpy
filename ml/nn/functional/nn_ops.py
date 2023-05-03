@@ -128,7 +128,7 @@ def convolve2d(X :Variable ,
         X = X.transpose(0 , -1 , 1, 2) if NHWC else X
         w = W.transpose(-1 , 2 , 0 , 1)  if NHWC else W
         N = X.shape[0]
-        in_feats = w.shape[2]
+        in_feats = w.shape[1]
         C = w.shape[0]
         image_2col = _im2col(X, in_feats , w.shape[-2], w.shape[-1], stride, pad , outH ,outW , dilations)
         kernel_2col = w.reshape(w.shape[0], -1)
