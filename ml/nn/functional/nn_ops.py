@@ -15,11 +15,11 @@ def _im2col_indices(X_shape, fhei , fwi , stride , oh , ow,
     d1 , d2 = dilations
     _, C, H, W = X_shape
     i0 = np.repeat(np.arange(fhei), fwi)
-    i0 = np.tile(i0, C) * (d1 +1 )
+    i0 = np.tile(i0, C) * d1
     i1 = stride[0] * np.repeat(np.arange(oh), ow)
     i = i0.reshape(-1, 1) + i1.reshape(1, -1)
-    s1 = np.tile(np.arange(fwi), fhei *C ) * (d2 +1)
-    #s1 = np.tile(s1, C)
+    s1 = np.tile(np.arange(fwi), fhei ) 
+    s1 = np.tile(s1, C)* d2
     j1 = stride[1] * np.tile(np.arange(ow), oh)
     j = s1.reshape(-1, 1) + j1.reshape(1, -1)
     d = np.repeat(np.arange(C), fhei * fwi).reshape(-1, 1)
@@ -103,7 +103,7 @@ def pool2d( X : Variable ,
         # b h w c -> b c h w
         X = X.transpose(0,-1,1,2) if NHWC else X             
         N, C, _, _ = X.shape
-        image_2col = _im2col(X, size[0], size[1], stride,pad,  outH , outW , (0,0))
+        image_2col = _im2col(X, size[0], size[1], stride,pad,  outH , outW)
         image_2col = image_2col.reshape(C, image_2col.shape[0]//C, -1)
         y = mode(image_2col, axis=1)
         y = tuple(y.split(N,axis=1))
@@ -130,7 +130,7 @@ def convolve2d(X :Variable ,
         w = W.transpose(-1 , 2 , 0 , 1)  if NHWC else W
         N = X.shape[0]
         C = w.shape[0]
-        image_2col = _im2col(X, w.shape[-2], w.shape[-1], stride, pad , outH ,outW)
+        image_2col = _im2col(X, w.shape[-2], w.shape[-1], stride, pad , outH ,outW , dilations)
         kernel_2col = w.reshape(w.shape[0], -1)
         y = kernel_2col.dot(image_2col) 
         y = tuple(y.split(N , axis=1))
