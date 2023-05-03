@@ -1,10 +1,10 @@
 import ml 
+from modules import Module
 from ml.Variable import Variable
 from ml.nn.functional.nn_ops import moments, batch_norm
 from typing import Tuple
 
-class Module():
-    training:bool = True
+
 
 class Layer(Module):
 
@@ -18,10 +18,10 @@ class Layer(Module):
         return self.call(x)
     
     def parameters(self) ->list[Variable]:
-        if hasattr(self,'parameters_'):
-            return self.parameters_
-        else:
-            return []
+        return self.mine_params()
+    
+    
+
 
 
 class Linear(Layer):
@@ -29,7 +29,7 @@ class Linear(Layer):
                  units : int ,
                  use_bias : bool = True , 
                  weight_initializer = ml.initializers.GlorotUniform(),
-                 bias_initalizer = ml.initializers.Ones() ):
+                 bias_initalizer = ml.initializers.Zeros() ):
         super(Linear,self).__init__()
         self.units = units
         self.built = False
@@ -51,7 +51,11 @@ class Linear(Layer):
     def build(self , x):
         shape = x.shape 
         self.w :Variable = self.weight_initializer((shape[-1], self.units))
-        self.bias :Variable = self.bias_initalizer((self.units)) if self.use_bias else None
+        self.w.requires_grad = True
+        if self.use_bias:
+           self.bias :Variable = self.bias_initalizer((self.units)) 
+           self.bias.requires_grad = True
+        else : self.bias = None
         self.built = True
 
 
@@ -87,14 +91,17 @@ class LayerNorm(Layer):
     def build(self , x):
         shape = x.shape 
         axis  = self.axis if isinstance(self.axis , (list,tuple)) else (self.axis,)
-        
+        axis = (ax if ax>=0 else ax + len(x.shape) for ax  in axis)
         w_shape = (shape[-1],) if self.axis == -1 else \
             ( 1 if i not in axis else shape[i] for i in len(shape))
-
-        self.β :Variable = self.beta_initializer(w_shape)\
-                if self.center else None
-        self.γ :Variable = self.gamma_initializer(w_shape) \
-                if self.scale else None
+        if self.center:
+           self.β :Variable = self.beta_initializer(w_shape)
+           self.β.requires_grad=True
+        else : self.center = None
+        if self.scale:
+          self.γ :Variable = self.gamma_initializer(w_shape) 
+          self.γ.requires_grad = True
+        else : self.γ = None
         self.built = True
             
     
@@ -124,12 +131,13 @@ class BatchNorm(Layer):
         self.built = False
 
     def call(self , x:Variable)->Variable:
+        reduction_axes = tuple(dim for dim in range(x.ndim) if dim not in self.axis)
         if self.training:
-            batch_mean , batch_variance = moments(x , self.axis , keepdims= True)
+            batch_mean , batch_variance = moments(x , reduction_axes , keepdims= True)
             self.running_mean *= 1-self.μ
-            self.running_mean += self.μ * batch_mean.detach()
+            self.running_mean += self.μ * batch_mean.detach().squeeze(reduction_axes)
             self.running_var *= 1-self.μ
-            self.running_var += self.μ * batch_variance.detach()
+            self.running_var += self.μ * batch_variance.detach().squeeze(reduction_axes)
         else:
             batch_mean,batch_variance = self.running_mean , self.running_var
         
@@ -144,18 +152,25 @@ class BatchNorm(Layer):
 
     def build(self , x):
         shape = x.shape 
-        axis  = self.axis if isinstance(self.axis , (list,tuple)) else (self.axis,)
-        w_shape = (shape[-1],) if self.axis == -1 else \
-            ( 1 if i not in axis else shape[i] for i in len(shape))
-        self.β :Variable = self.beta_initializer(w_shape)\
-                if self.center else None
-        self.γ :Variable = self.gamma_initializer(w_shape) \
-                if self.scale else None
+        ax = self.axis
+        self.axis = [self.axis,] if isinstance(self.axis , int )else [ax if ax>=0 else ax + len(x.shape) for ax  in self.axis]
+        w_shape = (shape[-1],) if ax == -1 else \
+            [ 1 if i not in self.axis else shape[i] for i in range(len(x.shape)) ]
+        if self.center:
+           self.β :Variable = self.beta_initializer(w_shape)
+           self.β.requires_grad=True
+        else : self.center = None
+        if self.scale:
+          self.γ :Variable = self.gamma_initializer(w_shape) 
+          self.γ.requires_grad = True
+        else : self.γ = None
         self.running_mean :Variable = self.running_mean_initializer(w_shape)
+        self.running_mean.requires_grad = False
         self.running_var:Variable = self.running_var_initializer(w_shape)
+        self.running_var.requires_grad = False
         self.built = True
 
-### TODO this ###############
+
 class GroupNorm(Layer):
     def __init__ (self,
                   groups=32,
@@ -173,7 +188,28 @@ class GroupNorm(Layer):
         self.scale = scale
         self.beta_initializer = beta_initializer
         self.gamma_initializer = gamma_initializer
-              
+
+    def call(self , x : Variable) ->Variable:
+        x = x.reshape(x.shape[0] , self.groups , -1)
+        mean , variance = ml.nn.moments(x , self.axis , True , 0)
+        return ml.nn.batch_norm(x , mean , variance , self.γ , self.β , self.ε)
+
+    def build(self , x : Variable):
+        shape = x.shape 
+        axis  = self.axis if isinstance(self.axis , (list,tuple)) else (self.axis,)
+        axis = (ax if ax>=0 else ax + len(x.shape) for ax  in axis)
+        w_shape = (shape[-1],) if self.axis == -1 else \
+            ( 1 if i not in axis else shape[i] for i in len(shape))
+        if self.center:
+           self.β :Variable = self.beta_initializer(w_shape)
+           self.β.requires_grad=True
+        else : self.center = None
+        if self.scale:
+          self.γ :Variable = self.gamma_initializer(w_shape) 
+          self.γ.requires_grad = True
+        else : self.γ = None
+        self.built = True 
+
 
 class Embedding(Layer):
     def __init__(self, 
@@ -183,6 +219,7 @@ class Embedding(Layer):
                  ):
         super(Embedding,self).__init__()
         self.w = weight_initializer((num_embedd,embedd_dim))
+        self.w.requires_grad = True
     
     @property
     def parameters_(self):return [self.w]
@@ -214,8 +251,8 @@ class Dropout(Layer):
     def call(self,x :Variable ) ->Variable:
 
         if self.training:
-           mask :Variable = ml.random.binomial(x.shape , 1 , 1 - self.rate , False,
-                                               'float16')
+           mask :Variable = ml.random.binomial(x.shape , 1 , 1 - self.rate , requires_grad = False,
+                                              dtype= 'float16')
            mask *=(1 / (1 - self.rate))
            x = x * mask
 
@@ -234,7 +271,7 @@ class Conv2D(Layer):
                  groups : int = 1,
                  use_bias : bool = True , 
                  kernel_initializer = ml.initializers.GlorotUniform(),
-                 bias_initalizer = ml.initializers.Ones(),
+                 bias_initalizer = ml.initializers.Zeros(),
                  data_format = 'NHWC' ):
         super(Conv2D,self).__init__()
         self.filters = filters
@@ -252,7 +289,7 @@ class Conv2D(Layer):
     @property
     def parameters_(self) ->list[Variable] : 
         params = []
-        if self.kernel : params.append(self.w)
+        if self.kernel : params.append(self.kernel)
         if self.bias : params.append(self.bias)
         return params
     
@@ -267,16 +304,21 @@ class Conv2D(Layer):
     
     def build(self , x):
         if self.data_format == 'NHWC':
-            if x.shape[1] % self.groups != 0 : raise ValueError('number of groups must be evenly divisible with features')
-            kernel_size = self.kernel_size + (x.shape[1] // self.groups, self.filters , ) 
+            if x.shape[-1] % self.groups != 0 : raise ValueError('number of groups must be evenly divisible with features')
+            kernel_size = self.kernel_size + (x.shape[-1] // self.groups, self.filters , ) 
             bias_size = (self.filters ,)
         else:  
-            if x.shape[-1] % self.groups != 0 : raise ValueError('number of groups must be evenly divisible with features')
-            kernel_size =  (self.filters , x.shape[-1] // self.groups , ) +self.kernel_size
+            if x.shape[1] % self.groups != 0 : raise ValueError('number of groups must be evenly divisible with features')
+            kernel_size =  (self.filters , x.shape[1] // self.groups , ) +self.kernel_size
             bias_size = (1,self.filters,1,1)
 
         self.kernel :Variable = self.kernel_initializer(kernel_size)
-        self.bias :Variable = self.bias_initalizer(bias_size) if self.use_bias else None
+        self.kernel.requires_grad = True
+        if self.use_bias:
+           self.bias :Variable = self.bias_initalizer(bias_size)
+           self.bias.requires_grad = True
+        else:
+            self.bias = None
         self.built = True
 
 

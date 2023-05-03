@@ -60,7 +60,7 @@ from ml.autograd.LinalgOps import will_it_need_transpose , get_axes , get_reshap
 
 class Variable: #  tensor of parameters and its gradient
 
-    def __init__(self ,
+    def __init__( self ,
                   buffer : np.ndarray ,
                   requires_grad : bool = None ,
                   is_leaf : bool = None,
@@ -188,7 +188,7 @@ class Variable: #  tensor of parameters and its gradient
            axis  = axis[0]
         return self.__squeeze( axis = axis )
     
-    def unsqueeze(self , dims)-> Variable:
+    def unsqueeze(self , dims )-> Variable:
         return self.__unsqueeze( axis = dims)
 
     def astype(self , type : np.dtype)-> Variable:
@@ -313,7 +313,7 @@ class Variable: #  tensor of parameters and its gradient
         y = y if isinstance(y , Variable) else Variable(y , False)
         if self.ndim == 1 and y.ndim == 1:
             return self.vdot(y)
-        return self.tensordot(y , [-1 , y.ndim - 2 ])
+        return self.tensordot(y , [-1 , y.ndim - 1 ])
     
     def outer_product(self , y) ->Variable:
           y = y if isinstance(y , Variable) else Variable(y , False)

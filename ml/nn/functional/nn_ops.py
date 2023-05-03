@@ -77,7 +77,7 @@ def _calulcate_padding_and_output_shape(pad , strides ,
              W = math.ceil( in_width / strides[1])
         else: raise ValueError('only VALID , SAME or explicit pad values supported')
     elif isinstance(pad, (list,tuple)):
-        if len(pad) != 4 : raise ValueError('explicit padding needs to be in the form of (top , bottom , right ,left)')
+        if len(pad) != 4 : raise ValueError('explicit padding needs to be in the form of (top , bottom , left ,right) or int')
         H = int( (in_height + pad[0] + pad[1] - filter_height ) / strides[0]) +1
         W = int( (in_width + pad[2] + pad[3]- filter_width ) / strides[1]) +1
     else : raise ValueError(f'padding expected to be string , int , tuple or list but got {pad.__class__}')
@@ -128,7 +128,7 @@ def convolve2d(X :Variable ,
         X = X.transpose(0 , -1 , 1, 2) if NHWC else X
         w = W.transpose(-1 , 2 , 0 , 1)  if NHWC else W
         N = X.shape[0]
-        in_feats = w.shape[1]
+        in_feats = w.shape[2]
         C = w.shape[0]
         image_2col = _im2col(X, in_feats , w.shape[-2], w.shape[-1], stride, pad , outH ,outW , dilations)
         kernel_2col = w.reshape(w.shape[0], -1)
@@ -157,7 +157,8 @@ def __validate_conv_args(data_format : str , image_shape , kernel_shape , stride
 ############### usable functions ###################################################################
 
 def conv2d(
-            Image : Variable , Kernel : Variable ,
+            Image : Variable ,
+            Kernel : Variable ,
             strides : Tuple[int] | int = (1,1) ,
             pad: str | Tuple[int] | int = 'VALID',
             dilations:int | Tuple[int] = 1,
@@ -207,7 +208,7 @@ def avg_pool2d( X :Variable,
 
 
 def moments(x : Variable , axis : list | tuple = -1 , 
-            keepdims = False , correction : int = 1 ):
+            keepdims = False , correction : int = 1 ) -> Tuple[Variable]:
     if isinstance(axis , int):
         axis = (axis,)
     mean : Variable = x.mean(axis , keepdims = True)
@@ -225,7 +226,7 @@ def batch_norm(
                gamma : Variable = None,
                beta : Variable = None ,
                eps : float =  1e-5
-               ):
+               )->Variable:
     inv_std = (variance+eps).rsqrt()
     y = (x - mean) * inv_std
     if gamma is not None:
