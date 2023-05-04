@@ -236,14 +236,14 @@ class Variable: #  tensor of parameters and its gradient
                 i+=inc
         return ( self.__getitem__(tuple(splits[i])) for i in range(num_splits)  )
     
-    def assign(self , value , index):
+    def assign(self , value , index , ufunc = None):
         value = Variable(value) if not isinstance(value,Variable) else value
         index = index.data if isinstance(index , Variable) else index
         if self.grad_fn is not None:
            raise RuntimeError(f'trying to assign to a connected in autograd graph tensor is not allowed,\
                                 found grad_fn={self.grad_fn}')
         f = ArrayOps.Assign(self, value)
-        ret = Variable(f(self.data , value.data , index) ,requires_grad=f.requires_grad , is_leaf = False)
+        ret = Variable(f(self.data , value.data , index , ufunc) ,requires_grad=f.requires_grad , is_leaf = False)
         if f.requires_grad:
             ret.grad_fn = f
         return ret

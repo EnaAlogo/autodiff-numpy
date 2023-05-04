@@ -1,6 +1,7 @@
 from ml.Variable import Function
 from ml.Variable import np
 from typing import Optional , Tuple , List , Any
+from ml.AutoGradContext import Context
 
 
 class Copy(Function):
@@ -191,13 +192,18 @@ class Index(Function):
 
 class Assign(Function):
         def __init__(self , x , y ):
+            assert x.requires_grad == False or x.grad_fn == None or Context.no_grad == True
             super(Assign , self).__init__(x ,y )
 
-        def __call__(self , x : np.ndarray , y : np.ndarray , index :Any =None ) -> np.ndarray :    
+        def __call__(self , x : np.ndarray , y : np.ndarray , index :Any =None, ufunc:np.ufunc =None ) -> np.ndarray :    
             self.index = index
-            x[index] = y
+            if ufunc is None:
+              x[index] = y
+            else :
+                ufunc.at(x,index,y)
             return x
         
+        # need to handle different gradients based on ufunc or maybe just str8 up not allow multiplications/division
         def backward(self , g :  np.ndarray ) ->  np.ndarray:
            if self.needs_grad(0):
              dx = np.copy(g)

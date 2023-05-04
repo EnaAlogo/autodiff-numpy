@@ -55,7 +55,7 @@ def col2im(DX : Variable , N:int , C:int, H:int , W:int,  fhei, fwi, stride, pad
     connection with any other node AND the addition operation does not store any tensor
     we are 'free' to do this and make sure we connect it with the input for proper back prop
     """
-    ret = im.assign(cols_reshaped , (slice(None) ,d,i,j) )
+    ret = im.assign(cols_reshaped , (slice(None) ,d,i,j) ,np.add )
 
     return ret if sum(pad) == 0 else ret[:,:,pad[0]:-pad[1],pad[2]:-pad[3]]
 
@@ -217,7 +217,7 @@ def conv2d(
      return convolve2d(Image , Kernel , pad , strides , outH , outW ,dilations , nhwc )
 
 
-def conv2d_tranpose(
+def conv2d_transpose(
             Image : Variable ,
             Kernel : Variable ,
             output_shape : Tuple[int],
