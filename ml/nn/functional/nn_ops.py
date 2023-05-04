@@ -1,12 +1,14 @@
 import numpy as np
 import math
 from ml.Variable import Variable
+from ml.autograd.ArithmeticOps import Add
+from ml.nn.initializers import zeros
 from typing import Tuple
 from ml.nn.functional.ops import concat
 
 
 ############ helpers ############################################################
-def _im2col_indices( C ,  fhei , fwi , stride , oh , ow,
+def _im_indices( C ,  fhei , fwi , stride , oh , ow,
                     dilations ):
     """
     indices are int tensors and never require gradient so we are free to use raw numpy here, 
@@ -24,16 +26,38 @@ def _im2col_indices( C ,  fhei , fwi , stride , oh , ow,
     d = np.repeat(np.arange(C), fhei * fwi).reshape(-1, 1)
     return i, j, d
 
-def _im2col(X, C, fhei, fwi, stride, pad , oh , ow ,dilation = (1,1)):
+def im2col(X, C, fhei, fwi, stride, pad , oh , ow ,dilation = (1,1)):
     """
     padding , advanced indexing and concatenating are already implemented and will
     be tracked by autograd engine
     """
     x_pad = X.pad(((0,0), (0,0), (pad[0], pad[1]), (pad[2], pad[3]))) if sum(pad) != 0  else X
-    i, j, d = _im2col_indices(C, fhei, fwi, stride, oh ,ow , dilation)
+    i, j, d = _im_indices(C, fhei, fwi, stride, oh ,ow , dilation)
     cols = x_pad[:, d, i, j]
     cols = concat(cols, axis=-1)
     return cols
+
+def col2im(DX : Variable , N:int , C:int, H:int , W:int,  fhei, fwi, stride, pad , oh , ow ,dilation = (1,1)):
+    """
+    padding , advanced indexing and concatenating are already implemented and will
+    be tracked by autograd engine
+    """
+    i, j, d = _im_indices(C, fhei, fwi, stride, H , W , dilation)
+    im = zeros((N,C,oh + pad[0] + pad[1],ow +pad[2] + pad[3] ) )
+    cols_reshaped = DX.reshape(C * fhei * fwi, -1, N)
+    cols_reshaped = cols_reshaped.transpose(2, 0, 1)
+    """ 
+    warning!!! massive hack very bad practice ->
+    normally inplace operations should not be possible because mutating 
+    a tensor can cause problems when calculating gradients in the backward pass since
+    the stored tensors inside the autograd nodes are of course not deep copies that 
+    would be terrible ,however... since the 'im' tensor was just created and theres no 
+    connection with any other node AND the addition operation does not store any tensor
+    we are 'free' to do this and make sure we connect it with the input for proper back prop
+    """
+    ret = im.assign(cols_reshaped , (slice(None) ,d,i,j) )
+
+    return ret if sum(pad) == 0 else ret[:,:,pad[0]:-pad[1],pad[2]:-pad[3]]
 
 def _calculate_padding_same(in_height , in_width, filter_height ,filter_width, strides):
     """ 
@@ -102,7 +126,7 @@ def pool2d( X : Variable ,
         # b h w c -> b c h w
         X = X.transpose(0,-1,1,2) if NHWC else X             
         N, C, _, _ = X.shape
-        image_2col = _im2col(X , X.shape[1], size[0], size[1], stride,pad,  outH , outW)
+        image_2col = im2col(X , X.shape[1], size[0], size[1], stride,pad,  outH , outW)
         image_2col = image_2col.reshape(C, image_2col.shape[0]//C, -1)
         y = mode(image_2col, axis=1)
         y = tuple(y.split(N,axis=1))
@@ -130,11 +154,34 @@ def convolve2d(X :Variable ,
         N = X.shape[0]
         in_feats = w.shape[1]
         C = w.shape[0]
-        image_2col = _im2col(X, in_feats , w.shape[-2], w.shape[-1], stride, pad , outH ,outW , dilations)
+        image_2col = im2col(X, in_feats , w.shape[-2], w.shape[-1], stride, pad , outH ,outW , dilations)
         kernel_2col = w.reshape(w.shape[0], -1)
-        y = kernel_2col.dot(image_2col) 
+        y = kernel_2col.matmul(image_2col) 
         y = tuple(y.split(N , axis=1))
         y = y[0].cat(y[1:] ).reshape(N, C , outH ,outW)
+        return y.transpose(0 , 2, -1 , 1)  if NHWC else y
+
+def deconvolve2d(
+               X :Variable ,
+               W :Variable , 
+               pad :Tuple[int] , 
+               stride :Tuple[int], 
+               outH :int, 
+               outW :int, 
+               dilations : Tuple[int],
+               NHWC : bool = True):
+        """
+        torch mainly uses NCHW and tensorflow NHWC i personally prefer the latter ,
+        when features are the second axis the kernel is ( filters , features , size0 , size1 ),
+        and when the features are last the kernel is ( size0 , size1 , features , filters ),
+        making sure the data are arranged properly is what these ugly tranposes are doing
+        """
+        X = X.transpose(0 , -1 , 1, 2) if NHWC else X
+        w = W.transpose(-1 , 2 , 0 , 1)  if NHWC else W
+        num_filters, _, filter_height, filter_width = w.shape
+        dout_reshaped = X.transpose(1, 2, 3, 0).reshape(num_filters, -1)
+        dx_cols = w.reshape(num_filters ,-1 ).T.matmul(dout_reshaped)
+        y = col2im(dx_cols,X.shape[0],w.shape[1],X.shape[2],X.shape[3],w.shape[-2],w.shape[-1],stride,pad,outH , outW , dilations )
         return y.transpose(0 , 2, -1 , 1)  if NHWC else y
 
 
@@ -156,6 +203,7 @@ def __validate_conv_args(data_format : str , image_shape , kernel_shape , stride
 
 ############### usable functions ###################################################################
 
+
 def conv2d(
             Image : Variable ,
             Kernel : Variable ,
@@ -167,6 +215,23 @@ def conv2d(
      dilations = tuple((dilations,dilations)) if isinstance(dilations,int) else dilations
      nhwc , strides , pad , outH , outW = __validate_conv_args(data_format, Image.shape , Kernel.shape , strides , pad , dilations)
      return convolve2d(Image , Kernel , pad , strides , outH , outW ,dilations , nhwc )
+
+
+def conv2d_tranpose(
+            Image : Variable ,
+            Kernel : Variable ,
+            output_shape : Tuple[int],
+            strides : Tuple[int] | int = (1,1) ,
+            pad: str | Tuple[int] | int = 'VALID',
+            dilations:int | Tuple[int] = 1,
+            data_format:str = 'NHWC'
+            ) -> Variable :
+     dilations = tuple((dilations,dilations)) if isinstance(dilations,int) else dilations
+     nhwc , strides , pad , _ , _ = __validate_conv_args(data_format, Image.shape , Kernel.shape , strides , pad , dilations)
+     outH ,outW =( output_shape[1] , output_shape[2] ) if nhwc else (output_shape[2] , output_shape[3])
+     return deconvolve2d(Image , Kernel , pad , strides , outH , outW ,dilations , nhwc )
+
+
 
 def max_pool2d( X :Variable,
                 pool_size : int | Tuple[int],
@@ -234,3 +299,4 @@ def batch_norm(
     if beta is not None:
         y =  y + beta
     return y
+

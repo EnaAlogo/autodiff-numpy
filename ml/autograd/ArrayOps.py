@@ -187,6 +187,26 @@ class Index(Function):
         output = np.zeros(self.input_shape)
         output[self.index] = g
         return output 
+    
+
+class Assign(Function):
+        def __init__(self , x , y ):
+            super(Assign , self).__init__(x ,y )
+
+        def __call__(self , x : np.ndarray , y : np.ndarray , index :Any =None ) -> np.ndarray :    
+            self.index = index
+            x[index] = y
+            return x
+        
+        def backward(self , g :  np.ndarray ) ->  np.ndarray:
+           if self.needs_grad(0):
+             dx = np.copy(g)
+             dx[self.index] = 0
+           else:
+               dx = None
+           return dx, g[self.index].reshape(self.parents[1].shape) if self.needs_grad(1) else None
+
+
 
     
 

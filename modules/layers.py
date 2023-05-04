@@ -37,13 +37,6 @@ class Linear(Layer):
         self.weight_initializer=weight_initializer
         self.bias_initalizer=bias_initalizer
 
-    @property
-    def parameters_(self) ->list[Variable] : 
-        params = []
-        if self.w : params.append(self.w)
-        if self.bias : params.append(self.bias)
-        return params
-    
     def call(self , x: Variable) ->Variable:
         y : Variable = x.tensordot( self.w , [ -1 , 0 ] )
         return y if self.bias is None else y + self.bias
@@ -80,13 +73,6 @@ class LayerNorm(Layer):
     def call(self , y:Variable)->Variable:
         mean , variance = moments(y, self.axis , keepdims = True  )
         return batch_norm(y , mean , variance ,self.γ , self.β , self.ε )
-    
-    @property
-    def parameters_(self) ->list[Variable] : 
-        params = []
-        if self.γ : params.append(self.γ)
-        if self.β : params.append(self.β)
-        return params
 
     def build(self , x):
         shape = x.shape 
@@ -142,13 +128,6 @@ class BatchNorm(Layer):
             batch_mean,batch_variance = self.running_mean , self.running_var
         
         return batch_norm(x , batch_mean , batch_variance ,self.γ ,self.β , self.ε)
-
-    @property
-    def parameters_(self) ->list[Variable] : 
-        params = []
-        if self.γ : params.append(self.γ)
-        if self.β : params.append(self.β)
-        return params
 
     def build(self , x):
         shape = x.shape 
@@ -221,9 +200,6 @@ class Embedding(Layer):
         self.w = weight_initializer((num_embedd,embedd_dim))
         self.w.requires_grad = True
     
-    @property
-    def parameters_(self):return [self.w]
-
     def call(self, x : Variable) ->Variable:
         return self.w[x]
 
@@ -285,13 +261,6 @@ class Conv2D(Layer):
         self.data_format = data_format
         self.groups = groups
         self.padding = padding
-
-    @property
-    def parameters_(self) ->list[Variable] : 
-        params = []
-        if self.kernel : params.append(self.kernel)
-        if self.bias : params.append(self.bias)
-        return params
     
     def call(self , x: Variable) ->Variable:
         y : Variable = ml.nn.conv2d(x , 
