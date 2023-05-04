@@ -4,7 +4,7 @@ class Module():
     training:bool = True
     
     # not sure if this works all the time and its painfully slow but its nice 
-    def mine_params(self) ->list[Variable]:
+    def parameters(self) ->list[Variable]:
         params = []
         for attr in dir(self):
             attr = getattr(self, attr)
@@ -13,5 +13,4 @@ class Module():
             elif isinstance(attr , Module):
                 if hasattr(attr , 'parameters'):
                     params = params + attr.parameters()
-                #params = params  + attr.mine_params() 
         return params

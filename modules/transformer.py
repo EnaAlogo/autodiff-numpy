@@ -22,10 +22,7 @@ class CausalSelfAttention(Layer):
         self.bias = ml.ones((1,1,block_size,block_size), requires_grad = False, dtype='bool').tril()
         self.n_head = n_head
         self.n_embd = n_embed
-
-    @property
-    def parameters_(self): return self.c_attn.parameters_ + self.c_proj.parameters_
-
+        
     def call(self , x):
         B , T , C = x.shape
         q , k , v = self.c_attn(x).split( 3 , axis=2)
@@ -68,10 +65,6 @@ class Block(Layer):
             Dropout(resid_dropout_rate)
         ])
 
-    @property
-    def parameters_(self): return self.ln_1.parameters() + self.attn.parameters() + self.ln_2.parameters()\
-    + self.mlp.parameters()
-
     def call(self , x):
         x  = self.attn(self.ln_1(x)) + x #residual conn
         x  = self.mlp(self.ln_2(x)) + x #residual conn
@@ -99,10 +92,6 @@ class Transformer(Layer):
             ])
         self.lm_head = Linear(vocab_size , use_bias= False)
         
-    @property
-    def parameters_(self):
-        return self.wte.parameters_ + self.wpe.parameters_ + self.h.parameters() + self.lm_head.parameters_
-
     def call(self , IDX :ml.tensor ):
         B , T = IDX.shape
 

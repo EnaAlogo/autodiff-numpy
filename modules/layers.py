@@ -17,8 +17,6 @@ class Layer(Module):
         self.__call__ = self.call 
         return self.call(x)
     
-    def parameters(self) ->list[Variable]:
-        return self.mine_params()
     
     
 

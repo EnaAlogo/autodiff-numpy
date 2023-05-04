@@ -22,11 +22,6 @@ class Block(layers.Layer):
         self.data_format= data_format
         self.built = False
 
-    def parameters(self) -> list[Variable]:
-        return self.conv1.parameters() + self.nrm2.parameters() + self.conv2.parameters()\
-               +self.nrm1.parameters() + \
-        (self.downsample.parameters() if self.downsample is not None else None)
-    
     def call(self , inputs):
         identity = inputs
         x = self.nrm1(self.conv1(inputs))
@@ -73,12 +68,7 @@ class Bottleneck(layers.Layer):
         self.planes = planes
         self.data_format= data_format
         self.built = False
-
-    def parameters(self) -> list[Variable]:
-        return self.conv1.parameters() + self.nrm2.parameters() + self.conv2.parameters()\
-               +self.nrm1.parameters() + \
-        (self.downsample.parameters() if self.downsample is not None else None)
-    
+ 
     def call(self , inputs):
         identity = inputs
         x = self.nrm1(self.conv1(inputs))
