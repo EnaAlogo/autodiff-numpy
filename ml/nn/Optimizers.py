@@ -28,21 +28,21 @@ class SGD(Optimizer) : # stochastic gradient descent
         self.nesterov = nesterov
         self.b = [initializers.zeros(p.shape) for p in parameters] \
                 if momentum else None
-        
-    @stop_gradient
-    def step(self) -> None : 
-        for i,x in enumerate(self.parameters):
-            assert x.grad is not None and x.data.shape == x.grad.shape
-            G = x.gradient
 
-            if self.λ :
-                G += self.λ * x
-            if self.μ :
-                self.b[i] *= self.μ
-                self.b[i] += G
-                G = G + self.μ * self.b[i] if self.nesterov \
-                     else self.b[i]
-            x -= self.γ * G # wi+1 = wi - α * ▽wLm(w)
+    def step(self) -> None : 
+        with stop_gradient():
+            for i,x in enumerate(self.parameters):
+                assert x.grad is not None and x.data.shape == x.grad.shape
+                G = x.gradient
+    
+                if self.λ :
+                    G += self.λ * x
+                if self.μ :
+                    self.b[i] *= self.μ
+                    self.b[i] += G
+                    G = G + self.μ * self.b[i] if self.nesterov \
+                         else self.b[i]
+                x -= self.γ * G # wi+1 = wi - α * ▽wLm(w)
 
 
 
@@ -65,32 +65,34 @@ class Adam(Optimizer) :
         self.v_max = [initializers.zeros(p.shape) for p in parameters]\
                     if amsgrad else None
         
-    @stop_gradient
+    
     def step(self) -> None :
-        for i,x in enumerate(self.parameters):
-            assert x.grad is not None and x.data.shape == x.grad.shape ,f'at {i} {x} '
-            G = x.gradient
-            if self.λ :
-                G += self.λ * x
-            
-            self.m[i] *= self.betas[0] # m <- b0 * m-1 + (1-b0) * ▽w
-            self.m[i] += (1- self.betas[0]) * G 
-            self.v[i] *= self.betas[1] # v <- b1 * v-1 + (1-b1) * ▽w²
-            self.v[i] += (G**2) * (1- self.betas[1])
-            #i 1indexed to avoid division by zero but is this correct?
-            m_hat = self.m[i] / ( 1 - self.betas[0] ** (i+1) )
-            v_hat = self.v[i] / ( 1 - self.betas[1] ** (i+1) )
-            m_hat *= self.γ #scale with learning rate
-            
-            if self.amsgrad:
-                self.v_max[i] = self.v_max[i].maximum(v_hat)
-                _v_max = self.v_max[i].sqrt()
-                _v_max += self.ε
-                m_hat /= _v_max
-                x -=  m_hat
-            else:
-                v_hat = v_hat.sqrt_()#v_hat is a temporary inplace is prefered
-                v_hat += self.ε 
-                m_hat /= v_hat
-                x -=  m_hat
-          
+        with stop_gradient():
+            for i,x in enumerate(self.parameters):
+                assert x.grad is not None and x.data.shape == x.grad.shape ,f'at {i} {x} '
+                G = x.gradient
+                if self.λ :
+                    G += self.λ * x
+                
+                self.m[i] *= self.betas[0] # m <- b0 * m-1 + (1-b0) * ▽w
+                self.m[i] += (1- self.betas[0]) * G 
+                self.v[i] *= self.betas[1] # v <- b1 * v-1 + (1-b1) * ▽w²
+                self.v[i] += (G**2) * (1- self.betas[1])
+                #i 1indexed to avoid division by zero but is this correct?
+                m_hat = self.m[i] / ( 1 - self.betas[0] ** (i+1) )
+                v_hat = self.v[i] / ( 1 - self.betas[1] ** (i+1) )
+                m_hat *= self.γ #scale with learning rate
+                
+                if self.amsgrad:
+                    self.v_max[i] = self.v_max[i].maximum(v_hat)
+                    _v_max = self.v_max[i].sqrt()
+                    _v_max += self.ε
+                    m_hat /= _v_max
+                    x -=  m_hat
+                else:
+                    v_hat = v_hat.sqrt_()#v_hat is a temporary inplace is prefered
+                    v_hat += self.ε 
+                    m_hat /= v_hat
+                    x -=  m_hat
+              
+    
