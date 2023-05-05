@@ -2,7 +2,7 @@ from ml.AutoGradContext import stop_gradient , np ,cupy , cuda_is_available , De
 from ml.Variable import Variable
 
 class Module():
-    training:bool = True
+    __training:bool = True
     
     # not sure if this works all the time and its painfully slow but its nice 
     def parameters(self) ->list[Variable]:
@@ -25,3 +25,12 @@ class Module():
                 Variable.to_(attr,Device.CUDA)
             elif isinstance(attr , Module):
                 Module.cuda(attr)
+
+
+    def training(self) ->bool: 
+        return Module.__training
+ 
+    def set_training(self, val : bool) -> None :
+        if not isinstance(val , bool):
+            raise ValueError(f'bool expected got {val.__class__}')
+        Module.__training = val

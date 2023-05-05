@@ -179,53 +179,73 @@ class Variable: #  tensor of parameters and its gradient
     
     def __matmul__(self , y ) -> Variable :
         return self.dot(y)
+    
     def __add__(self , y)-> Variable:
+        if isinstance(y ,(int , float , complex , bool)):
+           return self.__shift(c=y)
         y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__add(y)
+    
     def __sub__(self , y)-> Variable:
+        if isinstance(y , (int , float , complex , bool)):
+           return self.__shift(c=-y)
         y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__sub(y)
     def __mul__(self , y)-> Variable:
+        if isinstance(y , (int , float , complex , bool)):
+           return self.__scale(c=y)
         y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__mul(y)
     def __truediv__(self , y)-> Variable:
+        if isinstance(y ,(int , float , complex , bool)):
+           return self.__scale(c=1.0/y)
         y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__div(y)
     def __pow__(self , y):
+        if isinstance(y ,(int , float , complex , bool)):
+           return self.__powconst(c=y)
         y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__pow(y)
 
     def __rsub__(self , y )-> Variable:
+        if isinstance(y , (int , float , complex , bool)):
+            return self.__negate(c=y)
         y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return y - self
 
     def __radd__(self ,y )-> Variable:
+        if isinstance(y , (int , float , complex , bool)):
+            return self.__shift(c=y)
         y = Variable(y, False, device=self.__device) if not isinstance(y,Variable) else y
         return y + self
     
     def __rtruediv__(self , y )-> Variable:
+        if isinstance(y , (int , float , complex , bool)):
+            return self.__reciprocal(c=y)
         y = Variable(y, False, device=self.__device) if not isinstance(y,Variable) else y
         return y / self
     
     def __rmul__(self , y )-> Variable:
+        if isinstance(y , (int , float , complex , bool)):
+            return self.__scale(c=y)
         y = Variable(y, False, device=self.__device) if not isinstance(y,Variable) else y
         return y * self
     
     def __neg__(self)-> Variable:
-        return 0-self
+        return self.__negate(c=0)
      
 
     def broadcast_to(self , *shape: list | tuple)-> Variable:
         return self.__broadcast_to( shape = shape)
 
     def reshape(self , *shape : list | tuple)-> Variable:
-        return self.__reshape( shape = shape if shape else None)
+        return self.__reshape( shape = shape )
     
     def transpose(self , *axes : list | tuple )-> Variable:
-        return self.__transpose( axes = axes if axes else None)
+        return self.__transpose( axes = axes )
     
     def flip(self , *axes : list | tuple )-> Variable:
-        return self.__flip( axis = axes if axes else None)
+        return self.__flip( axis = axes )
     
     def pad(self , pads  : list[tuple[int]] | tuple[tuple[int]] | int )-> Variable:
         return self.__pad( paddings = pads)
@@ -527,7 +547,16 @@ class Variable: #  tensor of parameters and its gradient
     def matmul(self , x : Variable) -> Variable :...
     @register_gradient(LinalgOps.VectorDotProduct)
     def vdot(self , x : Variable) -> Variable :...
-
+    @register_gradient(ArithmeticOps.Scale)
+    def __scale(self , c = 0 ) ->Variable : ...
+    @register_gradient(ArithmeticOps.PowConst)
+    def __powconst(self , c = 0 ) ->Variable : ...
+    @register_gradient(ArithmeticOps.Negate)
+    def __negate(self , c = 0 ) ->Variable : ...
+    @register_gradient(ArithmeticOps.Shift)
+    def __shift(self , c = 0 ) ->Variable : ...
+    @register_gradient(ArithmeticOps.Reciprocal)
+    def __reciprocal(self , c = 0 ) ->Variable : ...
     
 ################## back prop ####################################
 

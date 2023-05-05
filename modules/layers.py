@@ -17,6 +17,7 @@ class Layer(Module):
         self.__call__ = self.call 
         return self.call(x)
     
+
     
     
 
@@ -68,16 +69,17 @@ class LayerNorm(Layer):
         self.gamma_initializer=gamma_initializer
         self.built = False
 
-    def call(self , y:Variable)->Variable:
-        mean , variance = moments(y, self.axis , keepdims = True  )
+    def call(self , y:Variable)->Variable:#should i use bessels correction ?
+        mean , variance = moments(y, self.axis , keepdims = True , correction= 0  )
         return batch_norm(y , mean , variance ,self.γ , self.β , self.ε )
 
     def build(self , x):
         shape = x.shape 
-        axis  = self.axis if isinstance(self.axis , (list,tuple)) else (self.axis,)
-        axis = (ax if ax>=0 else ax + len(x.shape) for ax  in axis)
-        w_shape = (shape[-1],) if self.axis == -1 else \
-            ( 1 if i not in axis else shape[i] for i in len(shape))
+        ax = self.axis
+        self.axis = [self.axis if self.axis>=0 else self.axis+x.ndim,] \
+            if isinstance(self.axis , int )else [ax if ax>=0 else ax + len(x.shape) for ax  in self.axis]
+        w_shape = (shape[-1],) if ax == -1 else \
+            [ 1 if i not in self.axis else shape[i] for i in range(len(x.shape)) ]
         if self.center:
            self.β :Variable = self.beta_initializer(w_shape)
            self.β.requires_grad=True
@@ -116,12 +118,12 @@ class BatchNorm(Layer):
 
     def call(self , x:Variable)->Variable:
         reduction_axes = tuple(dim for dim in range(x.ndim) if dim not in self.axis)
-        if self.training:
-            batch_mean , batch_variance = moments(x , reduction_axes , keepdims= True)
+        if self.training():
+            batch_mean , batch_variance = moments(x , reduction_axes , keepdims= True , correction= 0)
             self.running_mean *= 1-self.μ
-            self.running_mean += self.μ * batch_mean.detach().squeeze(reduction_axes)
+            self.running_mean += self.μ * batch_mean.detach().reshape(*self.running_mean.shape) 
             self.running_var *= 1-self.μ
-            self.running_var += self.μ * batch_variance.detach().squeeze(reduction_axes)
+            self.running_var += self.μ * batch_variance.detach().reshape(*self.running_var.shape) 
         else:
             batch_mean,batch_variance = self.running_mean , self.running_var
         
@@ -130,7 +132,8 @@ class BatchNorm(Layer):
     def build(self , x):
         shape = x.shape 
         ax = self.axis
-        self.axis = [self.axis,] if isinstance(self.axis , int )else [ax if ax>=0 else ax + len(x.shape) for ax  in self.axis]
+        self.axis = [self.axis if self.axis>=0 else self.axis+x.ndim,] \
+            if isinstance(self.axis , int )else [ax if ax>=0 else ax + len(x.shape) for ax  in self.axis]
         w_shape = (shape[-1],) if ax == -1 else \
             [ 1 if i not in self.axis else shape[i] for i in range(len(x.shape)) ]
         if self.center:
@@ -173,10 +176,11 @@ class GroupNorm(Layer):
 
     def build(self , x : Variable):
         shape = x.shape 
-        axis  = self.axis if isinstance(self.axis , (list,tuple)) else (self.axis,)
-        axis = (ax if ax>=0 else ax + len(x.shape) for ax  in axis)
-        w_shape = (shape[-1],) if self.axis == -1 else \
-            ( 1 if i not in axis else shape[i] for i in len(shape))
+        ax = self.axis
+        self.axis = [self.axis if self.axis>=0 else self.axis+x.ndim,] \
+            if isinstance(self.axis , int )else [ax if ax>=0 else ax + len(x.shape) for ax  in self.axis]
+        w_shape = (shape[-1],) if ax == -1 else \
+            [ 1 if i not in self.axis else shape[i] for i in range(len(x.shape)) ]
         if self.center:
            self.β :Variable = self.beta_initializer(w_shape)
            self.β.requires_grad=True
@@ -224,7 +228,7 @@ class Dropout(Layer):
     
     def call(self,x :Variable ) ->Variable:
 
-        if self.training:
+        if self.training():
            mask :Variable = ml.random.binomial(x.shape , 1 , 1 - self.rate , requires_grad = False,
                                               dtype= 'float16' ,device = x.device())
            mask *=(1 / (1 - self.rate))

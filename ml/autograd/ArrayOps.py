@@ -235,9 +235,3 @@ class Assign(Function):
            else:
                dx = None
            return dx, g[self.index].reshape(self.parents[1].shape) if self.needs_grad(1) else None
-
-
-
-    
-
-    

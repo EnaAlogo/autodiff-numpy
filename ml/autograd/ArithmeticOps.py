@@ -203,3 +203,74 @@ class Cosine(Function):
          ret *= self.backend.sin(self.x)
          return ret
 
+################### scalar ######################################################
+
+class Shift(Function):
+
+    def __init__(self , x ) ->None:
+        super(Shift , self ).__init__( x)
+
+    def __call__(self , x : np.ndarray , c : float | int | complex ) -> np.ndarray :    
+        return x + c
+    
+    def backward(self , g :  np.ndarray ) ->  np.ndarray:
+        return g 
+    
+class Scale(Function):
+
+    def __init__(self , x ) ->None:
+        super(Scale , self ).__init__( x)
+
+    def __call__(self , x : np.ndarray , c : float | int | complex ) -> np.ndarray :    
+        self.scaling_factor = c
+        return x * c
+    
+    def backward(self , g :  np.ndarray ) ->  np.ndarray:
+        return g * self.scaling_factor
+
+    
+class Negate(Function):
+
+    def __init__(self , x ) ->None:
+        super(Negate , self ).__init__( x)
+
+    def __call__(self , x : np.ndarray , c : float | int | complex ) -> np.ndarray :    
+        return c - x
+    
+    def backward(self , g :  np.ndarray ) ->  np.ndarray:
+        return - g
+
+
+class Reciprocal(Function):
+
+    def __init__(self , x ) ->None:
+        super(Reciprocal , self ).__init__( x)
+
+    def __call__(self , x : np.ndarray ,c : float | int | complex ) -> np.ndarray :    
+        self.scaling_factor = c
+        self.x = x
+        return c / x
+    
+    def backward(self , g :  np.ndarray ) ->  np.ndarray:
+          dx = -g
+          dx /= self.x
+          dx /= self.x
+          dx *= self.scaling_factor
+          return dx
+
+
+class PowConst(Function):
+
+    def __init__(self , x ) ->None:
+        super(PowConst , self ).__init__( x)
+
+    def __call__(self , x : np.ndarray ,c : float | int | complex ) -> np.ndarray :    
+        self.scaling_factor = c
+        self.x = x
+        return x ** c
+    
+    def backward(self , g :  np.ndarray ) ->  np.ndarray:
+         dx = self.x ** (self.scaling_factor-1)
+         dx *= self.scaling_factor
+         dx *= g
+         return dx
