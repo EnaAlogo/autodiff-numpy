@@ -7,7 +7,7 @@
 ## The main Variable class that represents a tensor of parameters is at [ml/Variable](ml/Variable.py)
 ## Theres also an example with the mnist dataset doing handwritten digits classification and an example using cuda mode and the cifar10 dataset to classify animal images with a CNN, the results are below :
 ## CNN cifar , clearly overfitting and thats okay its just meant to demonstrate that the training works(maybe)
-![image](cuda_cifar_example.png)
+![image](cnn_cifar10_example.png)
 ## MNIST digit classification
 ![image](mnist_results.png)
 
