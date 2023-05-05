@@ -14,7 +14,7 @@ def normalize(data : ml.tensor):
      data -= mean
      return data
 
-def to_sparse(numpy):#invert one hot transformation
+def to_sparse(numpy):#undo one hot transformation
      return numpy.argmax(-1)
  
 def one_hot_encode(classes : list[int] , data : ml.tensor | np.ndarray) ->ml.tensor :
