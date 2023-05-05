@@ -170,9 +170,7 @@ class GroupNorm(Layer):
         self.gamma_initializer = gamma_initializer
 
     def call(self , x : Variable) ->Variable:
-        x = x.reshape(x.shape[0] , self.groups , -1)
-        mean , variance = ml.nn.moments(x , self.axis , True , 0)
-        return ml.nn.batch_norm(x , mean , variance , self.γ , self.β , self.ε)
+        raise NotImplementedError('')
 
     def build(self , x : Variable):
         shape = x.shape 
