@@ -10,7 +10,7 @@ from ml.nn.functional.ops import concat
 
 ############ helpers ############################################################
 def _im_indices( C ,  fhei , fwi , stride , oh , ow,
-                    dilations ):
+                    dilations  ):
     """
     indices are int tensors and never require gradient so we are free to use raw numpy here, 
     i basically just want the indices theres no actual operation 
@@ -282,7 +282,7 @@ def moments(x : Variable , axis : list | tuple = -1 ,
     shift = x - mean
     scale =  1.0 / (np.prod( [ x.shape[ax] for ax in axis ] )-correction)
              
-    variance = (shift**2).sum(axis , keepdims) * scale
+    variance = (shift*shift).sum(axis , keepdims) * scale if correction != 0 else (shift*shift).mean(axis,keepdims)
 
     return mean if keepdims else mean.squeeze(axis) , variance
 

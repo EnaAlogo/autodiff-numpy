@@ -61,7 +61,7 @@ def inplace_operation( Op : type[function] ) ->function:
 
 
 
-from ml.autograd import ArithmeticOps , ArrayOps, LinalgOps , Reductions , FFTs
+from ml.autograd import ArithmeticOps , ArrayOps, LinalgOps , Reductions 
 from ml.autograd.LinalgOps import will_it_need_transpose , get_axes , get_reshape
 
 class Variable: #  tensor of parameters and its gradient
@@ -136,9 +136,9 @@ class Variable: #  tensor of parameters and its gradient
         return self.__move_to_device(device= device)
             
     def numpy(self) ->np.ndarray :
-        if self.device == Device.CPU:
+        if self.device() == Device.CPU:
             return self.data
-        elif self.device == Device.CUDA:
+        elif self.device() == Device.CUDA:
             assert cuda_is_available()
             return cupy.asnumpy(self.data)
         
@@ -164,23 +164,15 @@ class Variable: #  tensor of parameters and its gradient
                if self.__requires_grad and self.grad_fn is not None else f'{self.data.__repr__()} , shape={self.shape}'
     
     def __preproccess_single_sequence(self, slice):
-        s = slice
-        if isinstance(slice , Variable) and not slice.device() == self.device():
-            s = slice.to(self.device()).data
-        elif isinstance(slice, (list,tuple)):
-            s = Variable( slice , requires_grad = False , device=self.device).data
-        elif isinstance(slice, (cupy.ndarray , np.ndarray )):
-            s = Variable(slice , device= self.device() , requires_grad= False).data
-        return s
+        if isinstance(slice , Variable):
+            slice = slice.data
+        return slice
         
     def __getitem__(self , slices)-> Variable:
         if isinstance(slices,(tuple,list)):
            slices = tuple( self.__preproccess_single_sequence(s) for s in slices)
         elif isinstance(slices , Variable):
-            slices = slices.to(self.__device) if slices.device() != self.__device else slices
             slices = slices.data
-        elif isinstance(slices, (cupy.ndarray , np.ndarray )):
-            slices = Variable(slices , device= self.device() , requires_grad= False).data
         return self.__index(index = slices ) 
          
             

@@ -16,9 +16,12 @@ class Module():
                     params = params + attr.parameters()
         return params
     
-    def cuda(self):
+    def cuda(self) ->None :
         if not cuda_is_available():
             raise RuntimeError('cuda is not available on this machine')
-        params = self.parameters()
-        for param in params:
-            param.to_(Device.CUDA)
+        for attr in dir(self):
+            attr = getattr(self, attr)
+            if isinstance(attr , Variable):
+                Variable.to_(attr,Device.CUDA)
+            elif isinstance(attr , Module):
+                Module.cuda(attr)

@@ -16,4 +16,8 @@ class Sequential(Module):
 
     def parameters(self):
         return [p for module in self.modules for p in module.parameters()]
+    
+    def cuda(self):
+        for param in self.modules:
+            param.cuda()
 
