@@ -83,7 +83,7 @@ class Power (Function):
             dx = Function.reverse_broadcast(self.x.shape , dx)
         else : dx = None
         if self.needs_grad(1):
-            dy = self.z * np.log(self.x)#this cannot avoid the allocations cuz broadcasting
+            dy = self.z * self.backend.log(self.x)#this cannot avoid the allocations cuz broadcasting
             dy *= g
             dy = Function.reverse_broadcast(self.y.shape , dy)
         else : dy = None
@@ -108,7 +108,7 @@ class Maximum(_MinimumMaximum):
             super(Maximum , self ).__init__( x, y)
         
         def op(self , x , y):
-            return np.maximum(x,y)
+            return self.backend.maximum(x,y)
         def mask_fn(self,  x , y):
             return x>y
         
@@ -117,7 +117,7 @@ class Minimum(_MinimumMaximum):
             super(Minimum , self ).__init__( x, y)
         
         def op(self , x , y):
-            return np.minimum(x,y)
+            return self.backend.minimum(x,y)
         def mask_fn(self,  x , y):
             return x<y
 
@@ -130,7 +130,7 @@ class Logarithm(Function):
     
     def __call__(self , x : np.ndarray ) -> np.ndarray :  
         self.x = x
-        return np.log(x)
+        return self.backend.log(x)
     
     def backward(self , g :  np.ndarray ) ->  np.ndarray:
         return g / self.x
@@ -141,7 +141,7 @@ class Exp(Function):
         super(Exp , self).__init__(x)
     
     def __call__(self , x : np.ndarray ) -> np.ndarray :  
-        self.y = np.exp(x)
+        self.y = self.backend.exp(x)
         return self.y
     
     def backward(self , g :  np.ndarray ) ->  np.ndarray:
@@ -153,12 +153,12 @@ class SquareRoot(Function):
         super(SquareRoot , self).__init__(x)
     
     def __call__(self , x : np.ndarray ) -> np.ndarray :  
-        self.y = np.sqrt(x)
+        self.y = self.backend.sqrt(x)
         return self.y
     
     def backward(self , g :  np.ndarray ) ->  np.ndarray:
         ret = 2* self.y
-        ret = np.reciprocal(ret ,out =  ret)
+        ret = self.backend.reciprocal(ret ,out =  ret)
         ret *= g
         return ret
 
@@ -170,10 +170,10 @@ class AbsoluteValue(Function):
     
       def __call__(self , x : np.ndarray ) -> np.ndarray : 
         self.x = x 
-        return np.abs(x)
+        return self.backend.abs(x)
     
       def backward(self , g :  np.ndarray ) ->  np.ndarray:
-         ret = np.sign(self.x)
+         ret = self.backend.sign(self.x)
          ret *= g
          return ret
       
@@ -183,10 +183,10 @@ class Sine(Function):
     
       def __call__(self , x : np.ndarray ) -> np.ndarray : 
         self.x = x 
-        return np.sin(x)
+        return self.backend.sin(x)
     
       def backward(self , g :  np.ndarray ) ->  np.ndarray:
-         ret = np.cos(self.x)
+         ret = self.backend.cos(self.x)
          ret *= g
          return ret
 
@@ -196,10 +196,10 @@ class Cosine(Function):
     
       def __call__(self , x : np.ndarray ) -> np.ndarray : 
         self.x = x 
-        return np.cos(x)
+        return self.backend.cos(x)
     
       def backward(self , g :  np.ndarray ) ->  np.ndarray:
          ret = - g
-         ret *= np.sin(self.x)
+         ret *= self.backend.sin(self.x)
          return ret
 

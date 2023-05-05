@@ -26,7 +26,7 @@ class SGD(Optimizer) : # stochastic gradient descent
         self.μ = momentum
         self.γ = learning_rate
         self.nesterov = nesterov
-        self.b = [initializers.zeros(p.shape) for p in parameters] \
+        self.b = [initializers.zeros(p.shape ,device= p.device()) for p in parameters] \
                 if momentum else None
 
     def step(self) -> None : 
@@ -60,9 +60,9 @@ class Adam(Optimizer) :
         self.γ = learning_rate
         self.betas = betas
         self.amsgrad = amsgrad #On the Convergence of Adam and Beyond  Sashank J. Reddi, Satyen Kale, Sanjiv Kumar 15 Feb 2018 
-        self.m = [initializers.zeros(p.shape) for p in parameters]
-        self.v = [initializers.zeros(p.shape) for p in parameters]
-        self.v_max = [initializers.zeros(p.shape) for p in parameters]\
+        self.m = [initializers.zeros(p.shape ,device= p.device()) for p in parameters]
+        self.v = [initializers.zeros(p.shape ,device= p.device()) for p in parameters]
+        self.v_max = [initializers.zeros(p.shape ,device= p.device()) for p in parameters]\
                     if amsgrad else None
         
     

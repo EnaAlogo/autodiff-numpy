@@ -1,14 +1,18 @@
 from __future__ import annotations
 from typing import Any
-import numpy as np
 import math
-from ml.AutoGradContext import Context 
+from ml.AutoGradContext import Context , Device , cuda_is_available , cupy, np , get_backend    
+
+
 
 
 class Function: # parent class for all operations trackable by autograd engine
     def __init__(self, *vars : Variable) -> None :
         self.parents :tuple[Variable] = vars #parent nodes of the operation
         self.requires_grad :bool = any([ x.requires_grad for x in self.parents])
+        if any( (x.device() != self.parents[0].device() for x in self.parents)):
+            raise RuntimeError('operating on tensors that belong on different devices is not allowed used .to(device)')
+        self.backend = np if self.parents[0].device() == Device.CPU else cupy
     
     def needs_grad(self , i : int ):
         return self.parents[i].requires_grad
@@ -31,8 +35,8 @@ def register_gradient( Op : type[Function] ) -> function :
     def decorator( _ : function ) -> function :
         def invoke(*args : Variable , **kwargs) -> Variable :
             functor : Function = Op(*args)
-            out = Variable ( functor(*[x.numpy for x in args],**kwargs) ,
-                             requires_grad = functor.requires_grad, is_leaf = False )
+            out = Variable ( functor(*[x.data for x in args],**kwargs) ,
+                             requires_grad = functor.requires_grad, is_leaf = False  )
             if functor.requires_grad and not Context.no_grad:
                 out.grad_fn = functor
             return out
@@ -42,11 +46,13 @@ def register_gradient( Op : type[Function] ) -> function :
 # decorator ,handles inplace operations that only currently partially supported
 def inplace_operation( Op : type[function] ) ->function:
     def decorator( _ : function ) ->function:
-        def invoke(*args : Variable) -> None:
-            t : tuple[Variable] = tuple( x if isinstance(x,Variable) else Variable(x,requires_grad=False) for x in args  )
-            any_grad :bool = any([x.requires_grad for x in t])
+        def invoke(*args : Variable) -> None:                 #first arg can never be not a variable
+            t : tuple[Variable] = tuple( x if isinstance(x,Variable) else Variable(x,requires_grad=False, device = args[0].device()) for x in args  )
+            any_grad :bool = any((x.requires_grad for x in t))
+            if any((x.device() != t[0].device() for x in t)):
+                raise RuntimeError('operating on tensors that belong on different devices is not allowed used .to(device)')
             if Context.no_grad or not any_grad:
-               Op( *[ x.numpy for x in t ] )
+               Op( *[ x.data for x in t ] )
                return t[0] # the first tensor is the one being mutated maybe?? dunno seems to work
             else:
                 raise RuntimeError('inplace operations only supported for no_grad mode/tensors')
@@ -61,33 +67,46 @@ from ml.autograd.LinalgOps import will_it_need_transpose , get_axes , get_reshap
 class Variable: #  tensor of parameters and its gradient
 
     def __init__( self ,
-                  buffer : np.ndarray ,
+                  buffer : np.ndarray | cupy.ndarray | list | float,
                   requires_grad : bool = None ,
                   is_leaf : bool = None,
-                  dtype = None) ->None:
-        dtype = dtype if dtype is not None else np.float32
+                  dtype = None,
+                  device = None
+                  ) ->None:
         if isinstance(buffer , float) or isinstance(buffer , int):
-            buffer = np.array([buffer],dtype=dtype)
+            buffer = np.array([buffer],dtype='float') 
         elif isinstance(buffer, list) or isinstance(buffer , tuple):
-            buffer = np.array(buffer,dtype=dtype)
-        elif isinstance(buffer , np.ndarray) and buffer.dtype != dtype:
-            dtype = buffer.dtype
-        
-        self.data :np.ndarray = buffer
-        self.grad  : np.ndarray = None
+            buffer = np.array(buffer)
+            if dtype is not None and buffer.dtype != dtype:
+                buffer = buffer.astype(dtype)
+        self.data :np.ndarray | cupy.ndarray = buffer
+        self.grad  : np.ndarray  | cupy.ndarray = None
         self.grad_fn : type[Function] = None
-        self.__requires_grad :bool = requires_grad if requires_grad is not None else \
-                               buffer.dtype in (np.float16 , np.float32 , np.float64 , np.complex64 , np.complex128)\
-                               and not Context.no_grad
         self.__is_leaf :bool = is_leaf if is_leaf is not None else True
+        if device is None:
+            if isinstance(self.data , np.ndarray):
+                self.__device = Device.CPU
+            elif isinstance(self.data , cupy.ndarray):
+                self.__device = Device.CUDA
+        else :
+           self.__device = device if isinstance(device , Device) else Device[device.upper()]
+           if  self.__device == Device.CUDA and isinstance(self.data ,np.ndarray ):
+               self.data = cupy.asarray(self.data)
+           elif self.__device == Device.CPU and isinstance(self.data , cupy.ndarray):
+               self.data = cupy.asnumpy(self.data)
+        if self.__device == Device.CUDA and not cuda_is_available():
+            raise ValueError('cuda is not available on this machine')
+        backend = get_backend(self)
+        self.__requires_grad :bool = requires_grad if requires_grad is not None else \
+                               buffer.dtype in (backend.float16 , backend.float32 , backend.float64 , backend.complex64 , backend.complex128)\
+                               and not Context.no_grad
     
 
+   
     @property
     def size(self) -> int : return self.data.size
     @property
-    def numpy(self) ->np.ndarray :return self.data
-    @property
-    def gradient(self) -> Variable : return Variable(self.grad  , requires_grad= False) if self.grad  is not None else None
+    def gradient(self) -> Variable : return Variable(self.grad  , requires_grad= False , device = self.__device) if self.grad  is not None else None
     @property
     def ndim(self) -> int :return self.data.ndim
     @property
@@ -100,10 +119,30 @@ class Variable: #  tensor of parameters and its gradient
     def requires_grad(self) -> bool : return self.__requires_grad
     @requires_grad.setter
     def requires_grad(self , val : bool) ->None:
+        backend = get_backend(self)
         if not isinstance(val , bool):raise ValueError(f'value must be of type bool but got {val.__class__}')
-        if self.dtype not in (np.float16 , np.float32 , np.float64 , np.complex64 , np.complex128):
+        if self.dtype not in (backend.float16 , backend.float32 , backend.float64 , backend.complex64 , backend.complex128):
             raise ValueError('only floating point and complex number tensors can require gradients')
         self.__requires_grad = val
+    
+    def cpu(self):
+        return self.to(Device.CPU)
+    def cuda(self):
+        assert cuda_is_available()
+        return self.to(Device.CUDA)
+    def to(self , device):
+        if isinstance(device ,str):
+          device = Device[device.upper()]
+        return self.__move_to_device(device= device)
+            
+    def numpy(self) ->np.ndarray :
+        if self.device == Device.CPU:
+            return self.data
+        elif self.device == Device.CUDA:
+            assert cuda_is_available()
+            return cupy.asnumpy(self.data)
+        
+    def device(self) -> Device : return self.__device
 
     def detach(self)-> Variable:
         return Variable(self.data , False)
@@ -124,44 +163,60 @@ class Variable: #  tensor of parameters and its gradient
         return f'{self.data.__repr__()} , shape={self.shape} , grad_fn = {self.grad_fn.__class__}'\
                if self.__requires_grad and self.grad_fn is not None else f'{self.data.__repr__()} , shape={self.shape}'
     
-
+    def __preproccess_single_sequence(self, slice):
+        s = slice
+        if isinstance(slice , Variable) and not slice.device() == self.device():
+            s = slice.to(self.device()).data
+        elif isinstance(slice, (list,tuple)):
+            s = Variable( slice , requires_grad = False , device=self.device).data
+        elif isinstance(slice, (cupy.ndarray , np.ndarray )):
+            s = Variable(slice , device= self.device() , requires_grad= False).data
+        return s
+        
     def __getitem__(self , slices)-> Variable:
-        return self.__index(index = slices if not isinstance(slices , Variable) else slices.numpy ) 
+        if isinstance(slices,(tuple,list)):
+           slices = tuple( self.__preproccess_single_sequence(s) for s in slices)
+        elif isinstance(slices , Variable):
+            slices = slices.to(self.__device) if slices.device() != self.__device else slices
+            slices = slices.data
+        elif isinstance(slices, (cupy.ndarray , np.ndarray )):
+            slices = Variable(slices , device= self.device() , requires_grad= False).data
+        return self.__index(index = slices ) 
          
             
     
     def __matmul__(self , y ) -> Variable :
         return self.dot(y)
     def __add__(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__add(y)
     def __sub__(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__sub(y)
     def __mul__(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__mul(y)
     def __truediv__(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__div(y)
     def __pow__(self , y):
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__pow(y)
 
     def __rsub__(self , y )-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return y - self
 
     def __radd__(self ,y )-> Variable:
-        y = Variable(y, False) if not isinstance(y,Variable) else y
+        y = Variable(y, False, device=self.__device) if not isinstance(y,Variable) else y
         return y + self
     
     def __rtruediv__(self , y )-> Variable:
-        y = Variable(y, False) if not isinstance(y,Variable) else y
+        y = Variable(y, False, device=self.__device) if not isinstance(y,Variable) else y
         return y / self
     
     def __rmul__(self , y )-> Variable:
-        y = Variable(y, False) if not isinstance(y,Variable) else y
+        y = Variable(y, False, device=self.__device) if not isinstance(y,Variable) else y
         return y * self
     
     def __neg__(self)-> Variable:
@@ -237,7 +292,7 @@ class Variable: #  tensor of parameters and its gradient
         return ( self.__getitem__(tuple(splits[i])) for i in range(num_splits)  )
     
     def assign(self , value , index , ufunc = None):
-        value = Variable(value) if not isinstance(value,Variable) else value
+        value = Variable(value, device=self.__device) if not isinstance(value,Variable) else value
         index = index.data if isinstance(index , Variable) else index
         if self.grad_fn is not None:
            raise RuntimeError(f'trying to assign to a connected in autograd graph tensor is not allowed,\
@@ -254,31 +309,31 @@ class Variable: #  tensor of parameters and its gradient
     def __invert__(self)->Variable:#bool tensors can never require gradients
         return Variable( ~self.data , False)
     def __ne__(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return Variable(self.data != y.data , False)
     def __lt__(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return Variable(self.data < y.data , False)
     def __le__(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return Variable(self.data <= y.data , False)
     def __ge__(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return Variable(self.data >= y.data , False)
     def __gt__(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return Variable(self.data > y.data , False)
     def __eq__(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return Variable(self.data == y.data , False)
     def step_function(self)-> Variable:
-        return Variable(np.where(self.data >= .5 , 1 , 0) , False )
+        return Variable(get_backend(self).where(self.data >= .5 , 1 , 0) , False )
     def argsort(self , axis : int = None)-> Variable:
-        return Variable(np.argsort(self.data , axis) , False)
+        return Variable(get_backend(self).argsort(self.data , axis) , False)
     def argmax(self , axis : int = None)-> Variable:
-        return Variable(np.argmax(self.data ,axis=axis) , False )
+        return Variable(get_backend(self).argmax(self.data ,axis=axis) , False )
     def argmin(self , axis : int = None)-> Variable:
-        return Variable(np.argmin(self.data ,axis=axis) , False )
+        return Variable(get_backend(self).argmin(self.data ,axis=axis) , False )
 ###############################################################################################################
 
     def max(self ,axis = None, keepdims : bool = False) -> Variable:
@@ -298,10 +353,10 @@ class Variable: #  tensor of parameters and its gradient
 
 
     def maximum(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__maximum(y)
     def minimum(self , y)-> Variable:
-        y = Variable(y , False) if not isinstance(y,Variable) else y
+        y = Variable(y , False, device=self.__device) if not isinstance(y,Variable) else y
         return self.__minimum(y)
     
     def rsqrt(self)-> Variable:
@@ -418,6 +473,8 @@ class Variable: #  tensor of parameters and its gradient
     def contiguous(self) ->Variable:...
     @register_gradient(ArrayOps.Copy)
     def clone(self) ->Variable:...
+    @register_gradient(ArrayOps.MoveToDevice)
+    def __move_to_device(self , device = Device.CPU) ->Variable:...
 ############## reduce ops ####################################
     @register_gradient(Reductions.Variance)
     def __variance(self ,axis = None, keepdims : bool = False , correction : int = 1) :...
@@ -493,7 +550,8 @@ class Variable: #  tensor of parameters and its gradient
         return bprop(self, set(), [])
     
     def backward(self , input_grad :Variable = None) -> None :
-        self.grad  : np.ndarray = np.ones( shape = self.shape , dtype  = self.dtype) \
+        backend = get_backend(self)
+        self.grad   = backend.ones( shape = self.shape , dtype  = self.dtype) \
                                  if input_grad is None else input_grad
         graph : list[Variable] = self.__backprop()
         for node in reversed(graph):
@@ -510,7 +568,7 @@ class Variable: #  tensor of parameters and its gradient
                     and then we accumulate the gradients
                     """
                     if parent.__is_leaf and parent.grad  is None:
-                        parent.grad  = np.ascontiguousarray(grad)
+                        parent.grad  = backend.ascontiguousarray(grad)
                     elif parent.grad  is None:
                         parent.grad  = grad
                     else:
@@ -537,11 +595,26 @@ class Variable: #  tensor of parameters and its gradient
     def __inplacediv(x: np.ndarray , y: np.ndarray )-> None:
         x /= y
     @staticmethod
-    def __inplacesqrt(x : np.ndarray)-> None:
-        np.sqrt(x , out = x)
+    def __inplacesqrt(x)-> None:
+        backend = np if isinstance(x , np.ndarray) else cupy
+        backend.sqrt(x , out = x)
     @staticmethod  
-    def __inplaceexp(x : np.ndarray)->None:
-        np.exp(x , out= x)
+    def __inplaceexp(x)->None:
+        backend = np if isinstance(x , np.ndarray) else cupy
+        backend.exp(x , out= x)
+
+    def __inplace_to_device(self ,device):
+        device = device if not isinstance(device,str) else Device[device.upper()]
+        if device == self.device():
+            return 
+        if device == Device.CUDA:
+            assert cuda_is_available()
+            self.data = cupy.array(self.data)
+            self.__device = Device.CUDA
+        if device == Device.CPU:
+            self.data = cupy.asnumpy(self.data)
+            self.__device = Device.CPU
+        
     
     @inplace_operation(__inplaceadd)
     def __iadd__(self , y )-> Variable:...
@@ -555,5 +628,11 @@ class Variable: #  tensor of parameters and its gradient
     def sqrt_(self )-> Variable:...
     @inplace_operation(__inplaceexp)
     def exp_(self )-> Variable:...
+
+    def to_(self,device):
+        if self.requires_grad == False or self.grad_fn is None :
+            self.__inplace_to_device(device)
+        else:
+            raise RuntimeError(f'trying to modify tensor that is part of autograd graph with grad_fn={self.grad_fn}')
 
 

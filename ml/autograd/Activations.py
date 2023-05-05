@@ -2,13 +2,19 @@ from ml.Variable import Function , np , Variable , register_gradient
 from math import pi , sqrt
 from scipy.special import erf
 
+try: 
+    from cupyx.scipy.special import erf as cuda_erf
+except ModuleNotFoundError:
+    def cuda_erf(x , out = None):
+        raise RuntimeError('unreachable if youre seeing this well no surprise im just bad')
+
 class Relu(Function): 
 
     def __init__(self , x )->None:
         super(Relu,self).__init__(x)
 
     def __call__(self , y :np.ndarray )->np.ndarray: # relu(x) = max( x , 0 )
-        self.y =  np.maximum(y , 0)
+        self.y =  self.backend.maximum(y , 0)
         return self.y
     
     def backward(self  , g :np.ndarray )->np.ndarray:  # relu'(x) = 1 where x> 0 and 0 where x<0
@@ -21,9 +27,9 @@ class Sigmoid(Function):
 
     def __call__(self , y :np.ndarray )->np.ndarray: # σ(x) = 1 / 1 + exp(-x)
         x = -y 
-        x = np.exp(x ,out = x)
+        x = self.backend.exp(x ,out = x)
         x+=1
-        x = np.reciprocal(x,out= x)
+        x = self.backend.reciprocal(x,out= x)
         self.output = x
         return self.output
     
@@ -38,7 +44,7 @@ class Tanh(Function):
         super(Tanh,self).__init__(x) 
 
     def __call__(self , y :np.ndarray )->np.ndarray:# tanh(x) =  exp(x) - exp(-x) / exp(x) + exp(-x)
-        self.output = np.tanh(y)
+        self.output = self.backend.tanh(y)
         return self.output
 
     def backward(self  , g :np.ndarray )->np.ndarray:
@@ -65,15 +71,15 @@ class Celu(Function):
         self.α = alpha
         self.x  = y
         expxdiva :np.ndarray = y / alpha
-        self.expxdiva = np.exp(expxdiva , out= expxdiva)
+        self.expxdiva = self.backend.exp(expxdiva , out= expxdiva)
         out = self.expxdiva - 1
         out*= alpha
-        return np.maximum(0, y) + np.minimum( 0 , out )
+        return self.backend.maximum(0, y) + self.backend.minimum( 0 , out )
 
     
     def backward(self  , g :np.ndarray )->np.ndarray:
         self.expxdiva *= self.α
-        out =  np.where(self.x > 0 , 1 , self.expxdiva )
+        out =  self.backend.where(self.x > 0 , 1 , self.expxdiva )
         out *= g
         return out
     
@@ -85,9 +91,10 @@ class Gelu(Function):
     kbeta :float = (2.0 /sqrt(pi) ) * invsqrt2 * .5
 
     def __call__(self , y :np.ndarray)->np.ndarray:
+        _erf = erf if self.backend == np else cuda_erf
         self.x = y
         self.cdf = y * Gelu.invsqrt2
-        self.cdf = erf(self.cdf , out = self.cdf)
+        self.cdf = _erf(self.cdf , out = self.cdf)
         self.cdf += 1.0
         self.cdf *= 0.5
         return self.cdf  * self.x
@@ -95,7 +102,7 @@ class Gelu(Function):
     def backward(self  , g :np.ndarray )->np.ndarray:
        pdf = self.x * self.x
        pdf *= -0.5
-       pdf = np.exp(pdf , pdf)
+       pdf = self.backend.exp(pdf , pdf)
        pdf *= Gelu.kbeta
        pdf *= self.x
        pdf +=  self.cdf

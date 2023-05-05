@@ -226,7 +226,7 @@ class Dropout(Layer):
 
         if self.training:
            mask :Variable = ml.random.binomial(x.shape , 1 , 1 - self.rate , requires_grad = False,
-                                              dtype= 'float16')
+                                              dtype= 'float16' ,device = x.device())
            mask *=(1 / (1 - self.rate))
            x = x * mask
 

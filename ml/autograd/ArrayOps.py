@@ -1,7 +1,31 @@
 from ml.Variable import Function
-from ml.Variable import np
+from ml.Variable import np , cupy
 from typing import Optional , Tuple , List , Any
-from ml.AutoGradContext import Context
+from ml.AutoGradContext import Context ,Device , cuda_is_available
+
+
+
+
+
+
+class MoveToDevice(Function):
+    def __init__(self , x) ->None:
+        super(MoveToDevice , self).__init__(x)
+    
+    @staticmethod
+    def _to(x , device):
+       if device == Device.CUDA:
+           assert cuda_is_available() , 'cuda backend not available'
+           return cupy.asarray(x)
+       elif device == Device.CPU:
+           return cupy.asnumpy(x)
+    
+    def __call__(self , x , device ) :
+       self.dev = self.parents[0].device()
+       return MoveToDevice._to(x, device)
+       
+    def backward(self , g):
+        return MoveToDevice._to(g, self.dev)
 
 
 class Copy(Function):
@@ -10,7 +34,7 @@ class Copy(Function):
         super(Copy , self).__init__(x)
     
     def __call__(self , x : np.ndarray ) -> np.ndarray :  
-        return np.copy(x)
+        return self.backend.copy(x)
     
     def backward(self , g :  np.ndarray ) -> np.ndarray :
         return g
@@ -21,7 +45,7 @@ class Contiguous(Function):
         super(Contiguous , self).__init__(x)
     
     def __call__(self , x : np.ndarray ) -> np.ndarray :  
-        return np.ascontiguousarray(x)
+        return self.backend.ascontiguousarray(x)
     
     def backward(self , g :  np.ndarray ) -> np.ndarray :
         return g
@@ -32,24 +56,24 @@ class Transpose(Function):
         super(Transpose , self).__init__(x)
     
     @staticmethod
-    def __transpose(x : np.ndarray , axes : Tuple[int] | List[int]  = None) ->np.ndarray:
+    def __transpose(backend , x : np.ndarray , axes : Tuple[int] | List[int]  = None) ->np.ndarray:
         if x.ndim == 1:
             return x , None
         if axes is None:
             return x.T , None
         if len(axes) == 2 :
-            return np.swapaxes(x , axes[0] , axes[1]) , axes
+            return backend.swapaxes(x , axes[0] , axes[1]) , axes
         axes_ = [None]* len(axes)
         for i , dim in enumerate(axes):
             axes_[dim] = i
-        return np.transpose(x , axes) , axes_
+        return backend.transpose(x , axes) , axes_
     
     def __call__(self , x : np.ndarray , axes : Tuple[int] | List[int]   = None ) -> np.ndarray :  
-        ret , self.axes = Transpose.__transpose(x, axes)
+        ret , self.axes = Transpose.__transpose(self.backend , x, axes)
         return ret
     
     def backward(self , g :  np.ndarray ) -> np.ndarray :
-        return Transpose.__transpose(g, self.axes)[0]
+        return Transpose.__transpose(self.backend  , g, self.axes)[0]
     
 class Reshape(Function):
 
@@ -57,10 +81,10 @@ class Reshape(Function):
         super(Reshape , self).__init__(x)
     
     def __call__(self , x : np.ndarray , shape: tuple |  list) -> np.ndarray :  
-        return np.reshape(x , shape)
+        return self.backend.reshape(x , shape)
     
     def backward(self , g :  np.ndarray ) -> np.ndarray:
-        return np.reshape(g ,self.parents[0].shape)
+        return self.backend.reshape(g ,self.parents[0].shape)
     
 class Broadcast(Function):
 
@@ -68,7 +92,7 @@ class Broadcast(Function):
         super(Broadcast , self).__init__(x)
     
     def __call__(self , x : np.ndarray , shape: tuple |  list ) -> np.ndarray :  
-        return np.broadcast_to(x , shape)
+        return self.backend.broadcast_to(x , shape)
     
     def backward(self , g :  np.ndarray ) -> np.ndarray :
         return Function.reverse_broadcast(self.parents[0].shape , g )
@@ -86,7 +110,7 @@ class Pad(Function):
             for i in range(len(pads) , x.ndim):
                 pads.append( tuple((0,0,)) )
             self.slices : tuple[slice] = tuple( slice(f[0] , dim + f[0] ) for f , dim in zip(pads , x.shape ) )
-        return np.pad(x , paddings)
+        return self.backend.pad(x , paddings)
     
     def backward(self , g :  np.ndarray ) -> np.ndarray :
         return g[self.slices]
@@ -98,10 +122,10 @@ class Flip(Function):
     
     def __call__(self , x : np.ndarray , axis: tuple | int | list = None ) -> np.ndarray :  
         self.axes = axis
-        return np.flip(x , axis)
+        return self.backend.flip(x , axis)
     
     def backward(self , g :  np.ndarray ) -> np.ndarray :
-        return np.flip( g , self.axes )
+        return self.backend.flip( g , self.axes )
     
 class Squeeze(Function):
 
@@ -109,10 +133,10 @@ class Squeeze(Function):
         super(Squeeze , self).__init__(x)
     
     def __call__(self , x : np.ndarray , axis : tuple | int | list = None ) -> np.ndarray :  
-        return np.squeeze(x , axis)
+        return self.backend.squeeze(x , axis)
     
     def backward(self , g :  np.ndarray ) ->  np.ndarray :
-        return np.reshape(g , self.parents[0].shape)
+        return self.backend.reshape(g , self.parents[0].shape)
     
 class Unsqueeze(Function):
 
@@ -120,10 +144,10 @@ class Unsqueeze(Function):
         super(Unsqueeze , self).__init__(x)
     
     def __call__(self , x : np.ndarray , axis : Tuple | int | list ) -> np.ndarray :  
-        return np.expand_dims(x , axis)
+        return self.backend.expand_dims(x , axis)
     
     def backward(self , g :  np.ndarray ) ->  np.ndarray :
-        return np.reshape(g , self.parents[0].shape)
+        return self.backend.reshape(g , self.parents[0].shape)
     
     
 class Cast(Function):
@@ -143,11 +167,11 @@ class Where(Function):
     
     def __call__(self , x : np.ndarray , mask: np.ndarray , y : np.ndarray ) -> np.ndarray :  
         self.mask = mask
-        return np.where(mask , x , y )
+        return self.backend.where(mask , x , y )
     
     def backward(self , g :  np.ndarray ) -> tuple[ Optional[np.ndarray] ]:                     #mask gradient is always None
-         return  Function.reverse_broadcast(self.parents[0].shape,np.where(self.mask , g ,0 )) if self.needs_grad(0) else None, None ,\
-                  Function.reverse_broadcast(self.parents[2].shape,np.where(self.mask , 0  , g)) if self.needs_grad(2) else None 
+         return  Function.reverse_broadcast(self.parents[0].shape,self.backend.where(self.mask , g ,0 )) if self.needs_grad(0) else None, None ,\
+                  Function.reverse_broadcast(self.parents[2].shape,self.backend.where(self.mask , 0  , g)) if self.needs_grad(2) else None 
     
 class Concatenate(Function):
     def __init__(self, *tensors : tuple ) -> None:
@@ -155,11 +179,11 @@ class Concatenate(Function):
     
     def __call__(self , *tensors : tuple[np.ndarray] , axis: int = 0 ) -> np.ndarray : 
         self.axis = axis 
-        return np.concatenate(tensors , axis= axis)
+        return self.backend.concatenate(tensors , axis= axis)
     
     def backward(self , g :  np.ndarray ) -> tuple[ Optional[np.ndarray] ]:
          indices : list = np.cumsum([self.parents[i].shape[self.axis] for i in range(len(self.parents))])
-         return np.array_split( g , indices , axis = self.axis )
+         return self.backend.array_split( g , indices , axis = self.axis )
     
 class Stack(Function):
     def __init__(self, *tensors : tuple ) -> None:
@@ -167,10 +191,10 @@ class Stack(Function):
     
     def __call__(self , *tensors : tuple[np.ndarray] , axis: int = 0 ) -> np.ndarray : 
         self.axis = axis
-        return np.stack(tensors , axis= axis)
+        return self.backend.stack(tensors , axis= axis)
     
     def backward(self , g :  np.ndarray ) -> tuple[ Optional[np.ndarray] ]:
-         res =  np.split( g , len(self.parents) , axis = self.axis )
+         res =  self.backend.split( g , len(self.parents) , axis = self.axis )
          return ( s.squeeze(self.axis) if self.needs_grad(i) else None for s,i in zip(res , range(len(self.parents))) )
     
 
@@ -185,7 +209,7 @@ class Index(Function):
         return x[index]
     
     def backward(self , g : np.ndarray ) -> Tuple[Optional[np.ndarray]]:
-        output = np.zeros(self.input_shape)
+        output = self.backend.zeros(self.input_shape)
         output[self.index] = g
         return output 
     
@@ -195,7 +219,7 @@ class Assign(Function):
             assert x.requires_grad == False or x.grad_fn == None or Context.no_grad == True
             super(Assign , self).__init__(x ,y )
 
-        def __call__(self , x : np.ndarray , y : np.ndarray , index :Any =None, ufunc:np.ufunc =None ) -> np.ndarray :    
+        def __call__(self , x : np.ndarray , y : np.ndarray , index :Any =None, ufunc =None ) -> np.ndarray :    
             self.index = index
             if ufunc is None:
               x[index] = y
@@ -206,7 +230,7 @@ class Assign(Function):
         # need to handle different gradients based on ufunc or maybe just str8 up not allow multiplications/division
         def backward(self , g :  np.ndarray ) ->  np.ndarray:
            if self.needs_grad(0):
-             dx = np.copy(g)
+             dx = self.backend.copy(g)
              dx[self.index] = 0
            else:
                dx = None

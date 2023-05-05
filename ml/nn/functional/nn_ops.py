@@ -1,5 +1,6 @@
 import numpy as np
 import math
+from ml.AutoGradContext import get_backend
 from ml.Variable import Variable
 from ml.autograd.ArithmeticOps import Add
 from ml.nn.initializers import zeros
@@ -14,6 +15,7 @@ def _im_indices( C ,  fhei , fwi , stride , oh , ow,
     indices are int tensors and never require gradient so we are free to use raw numpy here, 
     i basically just want the indices theres no actual operation 
     """
+    # should i use get_backend here?
     d1 , d2 = dilations
     i0 = np.repeat(np.arange(fhei), fwi)
     i0 = np.tile(i0, C) * d1
@@ -43,7 +45,7 @@ def col2im(DX : Variable , N:int , C:int, H:int , W:int,  fhei, fwi, stride, pad
     be tracked by autograd engine
     """
     i, j, d = _im_indices(C, fhei, fwi, stride, H , W , dilation)
-    im = zeros((N,C,oh + pad[0] + pad[1],ow +pad[2] + pad[3] ) )
+    im = zeros((N,C,oh + pad[0] + pad[1],ow +pad[2] + pad[3] ) ,device = DX.device())
     cols_reshaped = DX.reshape(C * fhei * fwi, -1, N)
     cols_reshaped = cols_reshaped.transpose(2, 0, 1)
     """ 
@@ -55,7 +57,7 @@ def col2im(DX : Variable , N:int , C:int, H:int , W:int,  fhei, fwi, stride, pad
     connection with any other node AND the addition operation does not store any tensor
     we are 'free' to do this and make sure we connect it with the input for proper back prop
     """
-    ret = im.assign(cols_reshaped , (slice(None) ,d,i,j) ,np.add )
+    ret = im.assign(cols_reshaped , (slice(None) ,d,i,j) ,get_backend(im).add )
 
     return ret if sum(pad) == 0 else ret[:,:,pad[0]:-pad[1],pad[2]:-pad[3]]
 

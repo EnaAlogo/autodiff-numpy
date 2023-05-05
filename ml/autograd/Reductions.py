@@ -70,7 +70,7 @@ class Mean(Function):
     
     def backward(self , g :np.ndarray) -> np.ndarray:
                # derivative of x * y for dx is y * chaingrad, y doesnt require gradient its a scalar = 1/reduced dims
-        return np.broadcast_to(np.reshape(g * self.scale,self.outputshape)#keep the 1s before the squeeze for correct broadcast
+        return self.backend.broadcast_to(self.backend.reshape(g * self.scale,self.outputshape)#keep the 1s before the squeeze for correct broadcast
                               ,self.inputshape) #sum backwards is broadcasting
 
 class Sum(Function):
@@ -85,7 +85,7 @@ class Sum(Function):
         return out if  keepdims else out.squeeze(axis)
     
     def backward(self , g :np.ndarray) -> np.ndarray:
-        return np.broadcast_to(np.reshape(g,self.outputshape)  #keep the 1s before the squeeze for correct broadcast
+        return self.backend.broadcast_to(self.backend.reshape(g,self.outputshape)  #keep the 1s before the squeeze for correct broadcast
                                ,self.inputshape) #sum backwards is broadcasting
 
 class Norm(Function):
@@ -94,14 +94,14 @@ class Norm(Function):
         super(Norm ,self ).__init__(x)
 
     def __call__(self ,  x : np.ndarray , axis : tuple | int = None , keepdims : bool = False) ->np.ndarray:     
-        self.out : np.ndarray = np.linalg.norm(x , axis = axis , keepdims= keepdims)
+        self.out : np.ndarray = self.backend.linalg.norm(x , axis = axis , keepdims= keepdims)
         self.x = x
         self.outputshape = self.out.shape
         return self.out if  keepdims else self.out.squeeze(axis)
     
     def backward(self , g :np.ndarray) -> np.ndarray:
-        broadcasted_grad :np.ndarray = np.broadcast_to(
-            np.reshape(g , self.outputshape) , self.x.shape
+        broadcasted_grad :np.ndarray = self.backend.broadcast_to(
+            self.backend.reshape(g , self.outputshape) , self.x.shape
         )
         div_anorm : np.ndarray = self.x / self.out
 

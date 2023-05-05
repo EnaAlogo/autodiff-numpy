@@ -1,6 +1,7 @@
 from ml.Variable import Function
 from ml.Variable import np
 from typing import Tuple,Optional
+from functools import reduce
 
 class VectorDotProduct(Function):
      def __init__(self, x ,y ) -> None:
@@ -9,11 +10,11 @@ class VectorDotProduct(Function):
      def __call__(self , x : np.ndarray , y: np.ndarray ) -> np.ndarray :
         if x.ndim != 1 or y.ndim != 1 : raise ValueError(f'invalid inputs for vdot expected 1D got {x.shape} , {y.shape} ')  
         self.x , self.y = x , y
-        return np.vdot(x,y)
+        return x@y
     
      def backward(self , g :  np.ndarray ) ->  np.ndarray:
-         return  np.vdot(self.y , g)  if self.needs_grad(0) else None ,\
-                 np.vdot(g , self.x) if self.needs_grad(1) else None
+         return  self.y@ g  if self.needs_grad(0) else None ,\
+                 g @ self.x if self.needs_grad(1) else None
      
 class MatMul(Function):
      def __init__(self, x ,y ) -> None:
@@ -22,11 +23,11 @@ class MatMul(Function):
      def __call__(self , x : np.ndarray , y: np.ndarray ) -> np.ndarray : 
         if x.ndim != 2 or y.ndim != 2 : raise ValueError(f'invalid inputs for matmul expected 2D got {x.shape} , {y.shape} ') 
         self.x , self.y = x , y
-        return np.matmul(x,y)
+        return x@y
     
      def backward(self , g :  np.ndarray ) ->  np.ndarray:
-         return  np.matmul(g,self.y.T)  if self.needs_grad(0) else None ,\
-                 np.matmul(self.x.T, g) if self.needs_grad(1) else None
+         return  g@self.y.T  if self.needs_grad(0) else None ,\
+                 self.x.T@g if self.needs_grad(1) else None
 
 class Diag(Function):
      def __init__(self, x ) -> None:
@@ -34,10 +35,10 @@ class Diag(Function):
     
      def __call__(self , x : np.ndarray , k:int  = 0 ) -> np.ndarray :  
         self.k = k
-        return np.diag(x,k)
+        return self.backend.diag(x,k)
     
      def backward(self , g :  np.ndarray ) ->  np.ndarray:
-         return np.diag(g,self.k)
+         return self.backend.diag(g,self.k)
 
 
 class Diagonal(Function):
@@ -47,15 +48,16 @@ class Diagonal(Function):
      def __call__(self , x : np.ndarray , k:int  = 0 , axis0 = 0 , axis1 = 1) -> np.ndarray :  
         self.k = k
         self.ax0 , self.ax1 = axis0 , axis1
-        return np.diagonal(x , k , axis0 , axis1)
+        return self.backend.diagonal(x , k , axis0 , axis1)
     
      def backward(self , g :  np.ndarray ) ->  np.ndarray:
-         zeros:np.ndarray = np.zeros(self.parents[0].shape,
+         zeros:np.ndarray = self.backend.zeros(self.parents[0].shape,
                                      dtype = self.parents[0].dtype)
-         diagonal :np.ndarray = np.diagonal(
+         diagonal = self.backend.diagonal(
              zeros , self.k ,self.ax0 , self.ax1
          )
-         diagonal.flags['WRITEABLE'] = True
+         if self.backend == np: #numpys diagonal returns read only for some wierd reason
+           diagonal.flags['WRITEABLE'] = True
          diagonal[:] = g
          return zeros
     
@@ -74,14 +76,14 @@ class Triu(_TriuTril):
         super(Triu , self).__init__(x)
 
      def fn(self , x :np.ndarray , k : int):
-         return np.triu(x , k )
+         return self.backend.triu(x , k )
      
 class Tril(_TriuTril):
      def __init__(self, x ) -> None:
         super(Tril , self).__init__(x)
 
      def fn(self , x :np.ndarray , k : int):
-         return np.tril(x , k )
+         return self.backend.tril(x , k )
     
 
 class Inverse(Function):
@@ -90,7 +92,7 @@ class Inverse(Function):
         super(Inverse , self).__init__(x)
 
      def __call__(self , x : np.ndarray , k:int  = 0 ) -> np.ndarray :  
-        self.inv = np.linalg.inv(x)
+        self.inv = self.backend.linalg.inv(x)
         return self.inv
     
      def backward(self , g :  np.ndarray ) ->  np.ndarray:
@@ -103,7 +105,7 @@ class PseudoInverse(Function):
 
      def __call__(self , x : np.ndarray , k:int  = 0 ) -> np.ndarray :
         self.x = x  
-        self.inv = np.linalg.pinv(x)
+        self.inv = self.backend.linalg.pinv(x)
         return self.inv
     
      def backward(self , g :  np.ndarray ) ->  np.ndarray: 
@@ -125,9 +127,9 @@ class BatchedMatrixMultiplication(Function):
    
    def backward(self, g:np.ndarray)->Tuple[Optional[np.ndarray]]:
           return BatchedMatrixMultiplication.__handle_shapes(self.x.shape,\
-                 np.einsum('...cw,...hw->...ch',g,self.y)) if self.needs_grad(0) else None,\
+                 self.backend.einsum('...cw,...hw->...ch',g,self.y)) if self.needs_grad(0) else None,\
                  BatchedMatrixMultiplication.__handle_shapes(self.y.shape,\
-                 np.einsum('...ch,...cw->...hw',self.x,g)) if self.needs_grad(1) else None
+                 self.backend.einsum('...ch,...cw->...hw',self.x,g)) if self.needs_grad(1) else None
 
 class MatrixVectorProduct(Function):
    def __init__(self,x,y)->None:
@@ -135,12 +137,12 @@ class MatrixVectorProduct(Function):
 
    def __call__(self,x:np.ndarray,y:np.ndarray)->np.ndarray:
       self.x , self.y = x,y
-      return np.einsum('...ij,...j->...i',x,y)
+      return x@y
 
    def backward(self, g:np.ndarray)->Tuple[Optional[np.ndarray]]:
-      return np.einsum('...i,...j->...ij',g,self.y) if self.needs_grad(0) else None,\
+      return self.backend.einsum('...i,...j->...ij',g,self.y) if self.needs_grad(0) else None,\
              Function.reverse_broadcast(self.y.shape,
-             np.einsum('...ij,...i->...j',self.x,g)) if self.needs_grad(1) else None
+             self.backend.einsum('...ij,...i->...j',self.x,g)) if self.needs_grad(1) else None
 
   
 class Conjugate(Function):
@@ -148,10 +150,10 @@ class Conjugate(Function):
         super(Conjugate,self).__init__(x)
 
     def __call__(self,x:np.ndarray)->np.ndarray:
-      return np.conjugate(x)
+      return self.backend.conjugate(x)
 
     def backward(self, g:np.ndarray)->Optional[np.ndarray]:
-      return np.conjugate(g)
+      return self.backend.conjugate(g)
     
 ########## util funcs for setting up multi dimensional dot product ###############################################
 
